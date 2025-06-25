@@ -62,8 +62,8 @@ export default function SubscriptionPage() {
     name: "",
     phone: "",
     plan: "",
-    mealTypes: [],
-    deliveryDays: [],
+    mealTypes: [] as string[],
+    deliveryDays: [] as string[],
     allergies: "",
     address: "",
     city: "",
@@ -404,7 +404,7 @@ export default function SubscriptionPage() {
                             id={mealType.id}
                             checked={formData.mealTypes.includes(mealType.id)}
                             onCheckedChange={(checked) =>
-                              handleMealTypeChange(mealType.id, checked)
+                              handleMealTypeChange(mealType.id, !!checked)
                             }
                           />
                           <div className="flex-1">
@@ -450,7 +450,7 @@ export default function SubscriptionPage() {
                             id={day.id}
                             checked={formData.deliveryDays.includes(day.id)}
                             onCheckedChange={(checked) =>
-                              handleDeliveryDayChange(day.id, checked)
+                              handleDeliveryDayChange(day.id, !!checked)
                             }
                           />
                           <Label
@@ -573,7 +573,7 @@ export default function SubscriptionPage() {
                           Total per Bulan:
                         </div>
                         <div className="text-2xl font-bold">
-                          Rp{totalPrice.toLocaleString()}
+                          Rp{Math.round(totalPrice).toLocaleString()}
                         </div>
                       </div>
                     </div>

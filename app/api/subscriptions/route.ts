@@ -8,17 +8,36 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Validate required fields
-    const { name, phone, plan, mealTypes, deliveryDays, totalPrice } = body;
+    const {
+      name,
+      phone,
+      plan,
+      mealTypes,
+      deliveryDays,
+      totalPrice,
+      address,
+      city,
+    } = body;
 
     if (
       !name ||
       !phone ||
       !plan ||
       !mealTypes?.length ||
-      !deliveryDays?.length
+      !deliveryDays?.length ||
+      !address ||
+      !city
     ) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Phone validation
+    if (!/^08[0-9]{8,11}$/.test(phone)) {
+      return NextResponse.json(
+        { error: "Invalid phone number format" },
         { status: 400 }
       );
     }

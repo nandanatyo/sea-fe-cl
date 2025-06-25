@@ -8,14 +8,20 @@ import { useAuth } from "@/lib/hooks/use-auth";
 import { useSubscription } from "@/lib/hooks/use-subscription";
 import { PageLoading } from "@/components/common/loading/page-loading";
 import { StatsOverview } from "@/components/dashboard/user/stats-overview";
-import { SubscriptionCard } from "@/components/dashboard/user/subscription-card";
+import { SubscriptionList } from "@/components/dashboard/user/subscription-list";
+import { EmptySubscriptions } from "@/components/dashboard/user/empty-subscriptions";
 import { useRouter } from "next/navigation";
 
 export default function UserDashboard() {
   const router = useRouter();
   const { user, logout, requireAuth } = useAuth();
-  const { subscriptions, loading, pauseSubscription, cancelSubscription } =
-    useSubscription(user?.id);
+  const {
+    subscriptions,
+    loading,
+    pauseSubscription,
+    cancelSubscription,
+    reactivateSubscription,
+  } = useSubscription(user?.id);
 
   useEffect(() => {
     if (!requireAuth()) return;
@@ -31,6 +37,12 @@ export default function UserDashboard() {
 
   const activeSubscriptions = subscriptions.filter(
     (s) => s.status === "active"
+  );
+  const pausedSubscriptions = subscriptions.filter(
+    (s) => s.status === "paused"
+  );
+  const cancelledSubscriptions = subscriptions.filter(
+    (s) => s.status === "cancelled"
   );
 
   return (
@@ -66,45 +78,56 @@ export default function UserDashboard() {
         </div>
 
         {/* Active Subscriptions */}
-        <Card className="shadow-2xl border-0">
+        <Card className="shadow-2xl border-0 mb-8">
           <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-t-lg">
             <CardTitle className="text-2xl">Langganan Aktif Kamu 🍽️</CardTitle>
           </CardHeader>
           <CardContent className="p-8">
             {activeSubscriptions.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="text-6xl mb-4">🍽️</div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  Belum Ada Langganan Aktif
-                </h3>
-                <p className="text-gray-600 mb-6">
-                  Yuk mulai hidup sehat dengan berlangganan paket makanan kami!
-                </p>
-                <Button
-                  asChild
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600">
-                  <a href="/subscription">🚀 Mulai Langganan</a>
-                </Button>
-              </div>
+              <EmptySubscriptions />
             ) : (
-              <div className="grid gap-6">
-                {activeSubscriptions.map((subscription) => (
-                  <SubscriptionCard
-                    key={subscription.id}
-                    subscription={subscription}
-                    onViewDetails={() => {
-                      /* Handle view details */
-                    }}
-                    onPause={() =>
-                      pauseSubscription(subscription.id, new Date())
-                    }
-                    onCancel={() => cancelSubscription(subscription.id)}
-                  />
-                ))}
-              </div>
+              <SubscriptionList
+                subscriptions={activeSubscriptions}
+                onPause={pauseSubscription}
+                onCancel={cancelSubscription}
+                onReactivate={reactivateSubscription}
+                type="active"
+              />
             )}
           </CardContent>
         </Card>
+
+        {/* Paused Subscriptions */}
+        {pausedSubscriptions.length > 0 && (
+          <Card className="shadow-2xl border-0 mb-8">
+            <CardHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-t-lg">
+              <CardTitle className="text-2xl">Langganan Dijeda ⏸️</CardTitle>
+            </CardHeader>
+            <CardContent className="p-8">
+              <SubscriptionList
+                subscriptions={pausedSubscriptions}
+                onReactivate={reactivateSubscription}
+                type="paused"
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Cancelled Subscriptions */}
+        {cancelledSubscriptions.length > 0 && (
+          <Card className="shadow-2xl border-0">
+            <CardHeader className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-t-lg">
+              <CardTitle className="text-2xl">Riwayat Langganan 📋</CardTitle>
+            </CardHeader>
+            <CardContent className="p-8">
+              <SubscriptionList
+                subscriptions={cancelledSubscriptions}
+                onReactivate={reactivateSubscription}
+                type="cancelled"
+              />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

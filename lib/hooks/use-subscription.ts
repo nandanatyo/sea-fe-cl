@@ -3,7 +3,7 @@ import {
   subscriptionService,
   type CreateSubscriptionData,
 } from "@/lib/api/subscriptions";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/sonner";
 import { Subscription } from "@/lib/types";
 
 export function useSubscription(userId?: string) {

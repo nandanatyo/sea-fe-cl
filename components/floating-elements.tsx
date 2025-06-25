@@ -13,7 +13,7 @@ export function FloatingElements() {
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {/* Floating food emojis */}
+      {}
       <div
         className="absolute top-20 left-10 text-4xl animate-bounce"
         style={{ animationDelay: "0s" }}>
@@ -40,7 +40,7 @@ export function FloatingElements() {
         🍊
       </div>
 
-      {/* Floating geometric shapes */}
+      {}
       <div className="absolute top-1/4 left-1/3 w-4 h-4 bg-emerald-300 rounded-full animate-pulse opacity-60"></div>
       <div
         className="absolute top-1/2 right-1/4 w-6 h-6 bg-teal-300 rounded-full animate-pulse opacity-40"

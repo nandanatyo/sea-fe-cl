@@ -39,7 +39,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is admin
     const userData = localStorage.getItem("user");
     if (!userData) {
       router.push("/auth/login");
@@ -115,7 +114,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8 px-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {}
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
@@ -140,7 +139,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Date Range Selector */}
+        {}
         <Card className="shadow-lg border-0 mb-8">
           <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg">
             <CardTitle className="flex items-center gap-2">
@@ -167,7 +166,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Key Metrics */}
+        {}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="shadow-lg border-0 hover:shadow-xl transition-shadow">
             <CardContent className="p-6">
@@ -252,7 +251,7 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Additional Metrics */}
+        {}
         <div className="grid lg:grid-cols-2 gap-8 mb-8">
           <Card className="shadow-lg border-0">
             <CardHeader>
@@ -362,7 +361,7 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Recent Activity */}
+        {}
         <Card className="shadow-lg border-0">
           <CardHeader>
             <CardTitle>Aktivitas Terbaru 📊</CardTitle>

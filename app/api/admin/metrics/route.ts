@@ -6,12 +6,11 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    // Mock metrics data - in real app, calculate from database
     const metrics = {
       newSubscriptions: Math.floor(Math.random() * 50) + 20,
       monthlyRecurringRevenue: Math.floor(Math.random() * 100000000) + 50000000,
       reactivations: Math.floor(Math.random() * 15) + 5,
-      subscriptionGrowth: Math.floor(Math.random() * 30) - 5, // Can be negative
+      subscriptionGrowth: Math.floor(Math.random() * 30) - 5,
       totalActiveSubscriptions: Math.floor(Math.random() * 500) + 200,
       totalUsers: Math.floor(Math.random() * 1000) + 500,
       conversionRate: Math.floor(Math.random() * 20) + 10,

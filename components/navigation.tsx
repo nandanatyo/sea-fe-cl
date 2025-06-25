@@ -36,7 +36,7 @@ export function Navigation() {
           </div>
         </Link>
 
-        {/* Desktop Navigation */}
+        {}
         <nav className="hidden md:flex items-center space-x-8">
           {navigation.map((item) => (
             <Link
@@ -59,7 +59,9 @@ export function Navigation() {
             variant="ghost"
             size="sm"
             className="text-gray-600 hover:text-emerald-600">
-            <Link href="/auth/login">
+            <Link href="/login">
+              {" "}
+              {}
               <User className="h-4 w-4 mr-2" />
               Masuk
             </Link>
@@ -68,11 +70,15 @@ export function Navigation() {
             asChild
             size="sm"
             className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl">
-            <Link href="/auth/register">🚀 Daftar Sekarang</Link>
+            <Link href="/register">
+              {" "}
+              {}
+              🚀 Daftar Sekarang
+            </Link>
           </Button>
         </div>
 
-        {/* Mobile Navigation */}
+        {}
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild className="md:hidden">
             <Button variant="ghost" size="sm">
@@ -110,7 +116,9 @@ export function Navigation() {
                   asChild
                   variant="ghost"
                   className="w-full justify-start text-left">
-                  <Link href="/auth/login" onClick={() => setIsOpen(false)}>
+                  <Link href="/login" onClick={() => setIsOpen(false)}>
+                    {" "}
+                    {}
                     <User className="h-4 w-4 mr-2" />
                     Masuk ke Akun
                   </Link>
@@ -118,7 +126,9 @@ export function Navigation() {
                 <Button
                   asChild
                   className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700">
-                  <Link href="/auth/register" onClick={() => setIsOpen(false)}>
+                  <Link href="/register" onClick={() => setIsOpen(false)}>
+                    {" "}
+                    {}
                     🚀 Daftar Sekarang
                   </Link>
                 </Button>

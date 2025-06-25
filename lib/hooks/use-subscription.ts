@@ -1,4 +1,3 @@
-// lib/hooks/use-subscription.ts (UPDATED VERSION)
 import { useState, useEffect } from "react";
 import {
   subscriptionService,
@@ -7,7 +6,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Subscription } from "@/lib/types";
 
-// Mock data for demo purposes
 const mockSubscriptions: Subscription[] = [
   {
     id: "sub-1",
@@ -55,14 +53,8 @@ export function useSubscription(userId?: string) {
     try {
       setLoading(true);
 
-      // For demo purposes, use mock data
-      // In production, this would be:
-      // const response = await subscriptionService.getUserSubscriptions(userId);
-
-      // Simulate API delay
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Filter mock data by userId
       const userSubscriptions = mockSubscriptions.filter(
         (sub) => sub.userId === userId
       );
@@ -86,10 +78,8 @@ export function useSubscription(userId?: string) {
     try {
       setLoading(true);
 
-      // For demo purposes, simulate API call
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      // Create new subscription object
       const newSubscription: Subscription = {
         id: `sub-${Date.now()}`,
         userId: userId || "user-1",
@@ -109,7 +99,6 @@ export function useSubscription(userId?: string) {
         updatedAt: new Date().toISOString(),
       };
 
-      // Add to mock data
       mockSubscriptions.push(newSubscription);
 
       toast({
@@ -134,7 +123,6 @@ export function useSubscription(userId?: string) {
 
   const pauseSubscription = async (id: string, pauseUntil?: Date) => {
     try {
-      // Find and update subscription
       const subscriptionIndex = mockSubscriptions.findIndex(
         (sub) => sub.id === id
       );
@@ -169,7 +157,6 @@ export function useSubscription(userId?: string) {
 
   const cancelSubscription = async (id: string) => {
     try {
-      // Find and update subscription
       const subscriptionIndex = mockSubscriptions.findIndex(
         (sub) => sub.id === id
       );
@@ -202,7 +189,6 @@ export function useSubscription(userId?: string) {
 
   const reactivateSubscription = async (id: string) => {
     try {
-      // Find and update subscription
       const subscriptionIndex = mockSubscriptions.findIndex(
         (sub) => sub.id === id
       );

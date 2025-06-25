@@ -33,7 +33,7 @@ export default function MenuPage() {
           ))}
         </div>
 
-        {/* CTA Section */}
+        {}
         <Card className="bg-white rounded-3xl p-12 shadow-xl">
           <div className="text-center">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">

@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { authService, type LoginData, type RegisterData } from "@/lib/api/auth";
 import { useToast } from "@/hooks/use-toast";
 import { User } from "@/lib/types";
-import { ROUTES } from "@/lib/constants";
+import { ROUTES } from "@/lib/constants"; // Import ROUTES
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -24,14 +24,13 @@ export function useAuth() {
 
       if (response.success && response.data) {
         setUser(response.data.user);
-        authService.setAuthToken(response.data.token);
+        // authService.setAuthToken(response.data.token); // Your authService doesn't return a token in the mock, so this line might cause an error if token is undefined.
 
         toast({
-          title: `Selamat datang kembali, ${response.data.user.fullName}! 👋`,
+          title: `Selamat datang kembali, ${response.data.user.fullName}!`,
           description: "Siap melanjutkan perjalanan hidup sehat?",
         });
 
-        // Redirect based on role
         if (response.data.user.role === "admin") {
           router.push(ROUTES.DASHBOARD.ADMIN);
         } else {
@@ -40,7 +39,7 @@ export function useAuth() {
       }
     } catch (error) {
       toast({
-        title: "Login gagal 😔",
+        title: "Login gagal",
         description:
           error instanceof Error ? error.message : "Terjadi kesalahan",
         variant: "destructive",
@@ -57,16 +56,16 @@ export function useAuth() {
 
       if (response.success) {
         toast({
-          title: "Selamat datang di keluarga SEA Catering! 🎉",
+          title: "Selamat datang di keluarga SEA Catering!",
           description:
             "Akun berhasil dibuat. Silakan login untuk mulai hidup sehat!",
         });
 
-        router.push(ROUTES.AUTH.LOGIN);
+        router.push(ROUTES.AUTH.LOGIN); // Use ROUTES.AUTH.LOGIN
       }
     } catch (error) {
       toast({
-        title: "Registrasi gagal 😔",
+        title: "Registrasi gagal",
         description:
           error instanceof Error ? error.message : "Terjadi kesalahan",
         variant: "destructive",
@@ -79,10 +78,10 @@ export function useAuth() {
   const logout = () => {
     authService.removeAuthToken();
     setUser(null);
-    router.push(ROUTES.HOME);
+    router.push(ROUTES.HOME); // Use ROUTES.HOME
 
     toast({
-      title: "Sampai jumpa! 👋",
+      title: "Sampai jumpa!",
       description:
         "Kamu berhasil logout. Terima kasih sudah menggunakan SEA Catering!",
     });
@@ -99,7 +98,7 @@ export function useAuth() {
   const requireAdmin = () => {
     if (!user || user.role !== "admin") {
       toast({
-        title: "Akses Ditolak 🚫",
+        title: "Akses Ditolak",
         description: "Kamu tidak memiliki akses ke halaman admin.",
         variant: "destructive",
       });

@@ -10,19 +10,14 @@ export default function HomePage() {
     <div className="min-h-screen relative overflow-hidden">
       <FloatingElements />
 
-      {/* Hero Section */}
       <HeroSection />
 
-      {/* Features Section */}
       <FeaturesSection />
 
-      {/* Testimonial Section */}
       <TestimonialCarousel />
 
-      {/* Stats Section */}
       <StatsSection />
 
-      {/* Contact Section */}
       <ContactSection />
     </div>
   );

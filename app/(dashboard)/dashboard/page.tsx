@@ -48,7 +48,7 @@ export default function UserDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 py-8 px-4">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
+        {}
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
@@ -72,12 +72,12 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* Stats Overview */}
+        {}
         <div className="mb-8">
           <StatsOverview subscriptions={subscriptions} />
         </div>
 
-        {/* Active Subscriptions */}
+        {}
         <Card className="shadow-2xl border-0 mb-8">
           <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-t-lg">
             <CardTitle className="text-2xl">Langganan Aktif Kamu 🍽️</CardTitle>
@@ -97,7 +97,7 @@ export default function UserDashboard() {
           </CardContent>
         </Card>
 
-        {/* Paused Subscriptions */}
+        {}
         {pausedSubscriptions.length > 0 && (
           <Card className="shadow-2xl border-0 mb-8">
             <CardHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-t-lg">
@@ -113,7 +113,7 @@ export default function UserDashboard() {
           </Card>
         )}
 
-        {/* Cancelled Subscriptions */}
+        {}
         {cancelledSubscriptions.length > 0 && (
           <Card className="shadow-2xl border-0">
             <CardHeader className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-t-lg">

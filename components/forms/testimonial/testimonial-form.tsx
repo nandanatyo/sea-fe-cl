@@ -105,7 +105,7 @@ export function TestimonialForm({ onSuccess }: TestimonialFormProps) {
       </CardHeader>
       <CardContent className="p-8">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Personal Information */}
+          {}
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <Label htmlFor="customerName" className="text-base font-semibold">
@@ -141,7 +141,7 @@ export function TestimonialForm({ onSuccess }: TestimonialFormProps) {
             </div>
           </div>
 
-          {/* Plan and Location */}
+          {}
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <Label htmlFor="plan" className="text-base font-semibold">
@@ -190,7 +190,7 @@ export function TestimonialForm({ onSuccess }: TestimonialFormProps) {
             </div>
           </div>
 
-          {/* Rating */}
+          {}
           <div>
             <Label className="text-base font-semibold">
               Rating Pengalaman *
@@ -235,7 +235,7 @@ export function TestimonialForm({ onSuccess }: TestimonialFormProps) {
             )}
           </div>
 
-          {/* Review Message */}
+          {}
           <div>
             <Label htmlFor="reviewMessage" className="text-base font-semibold">
               Ceritakan Pengalaman Kamu *
@@ -261,7 +261,7 @@ export function TestimonialForm({ onSuccess }: TestimonialFormProps) {
             )}
           </div>
 
-          {/* Terms */}
+          {}
           <div className="bg-blue-50 p-4 rounded-lg">
             <h4 className="font-semibold text-blue-800 mb-2">
               📝 Ketentuan Testimoni:

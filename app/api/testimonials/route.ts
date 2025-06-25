@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-// Mock testimonials storage
 const testimonials = [];
 
 export async function POST(request: NextRequest) {
@@ -8,7 +7,6 @@ export async function POST(request: NextRequest) {
     const { customerName, email, plan, reviewMessage, rating, location } =
       await request.json();
 
-    // Validation
     if (!customerName || !email || !reviewMessage || !rating) {
       return NextResponse.json(
         { error: "Field wajib tidak boleh kosong" },
@@ -30,7 +28,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create testimonial
     const newTestimonial = {
       id: Math.random().toString(36).substr(2, 9),
       customerName,
@@ -39,7 +36,7 @@ export async function POST(request: NextRequest) {
       reviewMessage,
       rating,
       location,
-      approved: false, // Needs admin approval
+      approved: false,
       createdAt: new Date().toISOString(),
     };
 
@@ -59,7 +56,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  // Return approved testimonials only
   const approvedTestimonials = testimonials.filter((t) => t.approved);
   return NextResponse.json({ testimonials: approvedTestimonials });
 }

@@ -31,7 +31,6 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Simulate API call
     try {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
@@ -40,7 +39,6 @@ export default function ContactPage() {
         description: "Thank you for contacting us. We'll get back to you soon.",
       });
 
-      // Reset form
       setFormData({
         name: "",
         email: "",
@@ -69,7 +67,7 @@ export default function ContactPage() {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-12">
-          {/* Contact Information */}
+          {}
           <div className="space-y-8">
             <Card>
               <CardHeader>
@@ -149,7 +147,7 @@ export default function ContactPage() {
             </Card>
           </div>
 
-          {/* Contact Form */}
+          {}
           <Card>
             <CardHeader>
               <CardTitle>Send us a Message</CardTitle>

@@ -45,7 +45,7 @@ export default function TestimonialsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50">
-      {/* Header Section */}
+      {}
       <section className="py-16 px-4">
         <div className="max-w-6xl mx-auto text-center">
           <Badge
@@ -73,7 +73,7 @@ export default function TestimonialsPage() {
         </div>
       </section>
 
-      {/* Stats Section */}
+      {}
       <section className="py-12 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-4 gap-6">
@@ -96,7 +96,7 @@ export default function TestimonialsPage() {
         </div>
       </section>
 
-      {/* Main Content */}
+      {}
       <section className="py-12 px-4">
         <div className="max-w-6xl mx-auto">
           {showForm ? (
@@ -114,10 +114,10 @@ export default function TestimonialsPage() {
             </div>
           ) : (
             <>
-              {/* Testimonial Carousel */}
+              {}
               <TestimonialCarousel key={refreshCarousel} />
 
-              {/* Call to Action */}
+              {}
               <div className="text-center mt-16">
                 <div className="bg-white rounded-3xl p-12 shadow-xl">
                   <h2 className="text-3xl font-bold text-gray-900 mb-4">
@@ -141,7 +141,7 @@ export default function TestimonialsPage() {
         </div>
       </section>
 
-      {/* Benefits Section */}
+      {}
       <section className="py-16 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">

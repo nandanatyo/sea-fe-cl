@@ -133,8 +133,8 @@ export const ROUTES = {
   SUBSCRIPTION: "/subscription",
   CONTACT: "/contact",
   AUTH: {
-    LOGIN: "/auth/login",
-    REGISTER: "/auth/register",
+    LOGIN: "/login", // Changed from /auth/login
+    REGISTER: "/register", // Changed from /auth/register
   },
   DASHBOARD: {
     USER: "/dashboard",

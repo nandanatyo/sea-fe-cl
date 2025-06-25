@@ -1,13 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-// This would typically connect to a real database
-// For demo purposes, we'll simulate database operations
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Validate required fields
     const { name, phone, plan, mealTypes, deliveryDays, totalPrice } = body;
 
     if (
@@ -23,7 +19,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Simulate database save
     const subscription = {
       id: Math.random().toString(36).substr(2, 9),
       ...body,
@@ -31,7 +26,6 @@ export async function POST(request: NextRequest) {
       status: "active",
     };
 
-    // In a real app, you would save to database here
     console.log("New subscription created:", subscription);
 
     return NextResponse.json({
@@ -49,8 +43,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  // This would fetch subscriptions from database
-  // For demo purposes, return mock data
   const mockSubscriptions = [
     {
       id: "1",

@@ -38,7 +38,6 @@ export const authService = {
         };
       }
 
-      // Store user data in localStorage
       localStorage.setItem("user", JSON.stringify(result.user));
 
       return {

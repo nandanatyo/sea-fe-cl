@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,16 +30,6 @@ import { PriceSummary } from "./price-summary";
 
 export function SubscriptionForm() {
   const { createSubscription, loading } = useSubscription();
-  const [formData, setFormData] = useState<SubscriptionFormData>({
-    name: "",
-    phone: "",
-    plan: "",
-    mealTypes: [],
-    deliveryDays: [],
-    allergies: "",
-    address: "",
-    city: "",
-  });
 
   const {
     register,
@@ -47,41 +37,53 @@ export function SubscriptionForm() {
     formState: { errors },
     setValue,
     watch,
+    reset,
   } = useForm<SubscriptionFormData>({
     resolver: zodResolver(subscriptionSchema),
-    defaultValues: formData,
+    defaultValues: {
+      name: "",
+      phone: "",
+      plan: "",
+      mealTypes: [],
+      deliveryDays: [],
+      allergies: "",
+      address: "",
+      city: "",
+    },
   });
 
-  // Calculate total price
+  const watchedFields = watch();
+
   const totalPrice = useMemo(() => {
     return calculateSubscriptionPrice(
-      formData.plan,
-      formData.mealTypes.length,
-      formData.deliveryDays.length
+      watchedFields.plan,
+      watchedFields.mealTypes.length,
+      watchedFields.deliveryDays.length
     );
-  }, [formData.plan, formData.mealTypes.length, formData.deliveryDays.length]);
+  }, [
+    watchedFields.plan,
+    watchedFields.mealTypes.length,
+    watchedFields.deliveryDays.length,
+  ]);
 
   const handleMealTypeChange = (mealTypeId: string, checked: boolean) => {
+    const currentMealTypes = watchedFields.mealTypes || [];
     const newMealTypes = checked
-      ? [...formData.mealTypes, mealTypeId]
-      : formData.mealTypes.filter((id) => id !== mealTypeId);
-
-    setFormData((prev) => ({ ...prev, mealTypes: newMealTypes }));
-    setValue("mealTypes", newMealTypes);
+      ? [...currentMealTypes, mealTypeId]
+      : currentMealTypes.filter((id) => id !== mealTypeId);
+    setValue("mealTypes", newMealTypes, { shouldValidate: true });
   };
 
   const handleDeliveryDayChange = (dayId: string, checked: boolean) => {
+    const currentDeliveryDays = watchedFields.deliveryDays || [];
     const newDeliveryDays = checked
-      ? [...formData.deliveryDays, dayId]
-      : formData.deliveryDays.filter((id) => id !== dayId);
-
-    setFormData((prev) => ({ ...prev, deliveryDays: newDeliveryDays }));
-    setValue("deliveryDays", newDeliveryDays);
+      ? [...currentDeliveryDays, dayId]
+      : currentDeliveryDays.filter((id) => id !== dayId);
+    setValue("deliveryDays", newDeliveryDays, { shouldValidate: true });
   };
 
   const handlePlanChange = (planId: string) => {
-    setFormData((prev) => ({ ...prev, plan: planId }));
-    setValue("plan", planId);
+    setValue("plan", planId, { shouldValidate: true });
   };
 
   const onSubmit = async (data: SubscriptionFormData) => {
@@ -91,17 +93,7 @@ export function SubscriptionForm() {
     });
 
     if (success) {
-      // Reset form
-      setFormData({
-        name: "",
-        phone: "",
-        plan: "",
-        mealTypes: [],
-        deliveryDays: [],
-        allergies: "",
-        address: "",
-        city: "",
-      });
+      reset();
     }
   };
 
@@ -117,7 +109,7 @@ export function SubscriptionForm() {
           </CardHeader>
           <CardContent className="p-8">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-              {/* Personal Information Section */}
+              {}
               <div className="space-y-6">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
@@ -134,16 +126,10 @@ export function SubscriptionForm() {
                       Nama Lengkap *
                     </Label>
                     <Input
+                      id="name"
                       {...register("name")}
                       placeholder="Masukkan nama lengkap kamu"
                       className="mt-2 h-12"
-                      onChange={(e) => {
-                        register("name").onChange(e);
-                        setFormData((prev) => ({
-                          ...prev,
-                          name: e.target.value,
-                        }));
-                      }}
                     />
                     {errors.name && (
                       <p className="text-red-500 text-sm mt-1">
@@ -157,16 +143,10 @@ export function SubscriptionForm() {
                       Nomor WhatsApp Aktif *
                     </Label>
                     <Input
+                      id="phone"
                       {...register("phone")}
                       placeholder="08123456789"
                       className="mt-2 h-12"
-                      onChange={(e) => {
-                        register("phone").onChange(e);
-                        setFormData((prev) => ({
-                          ...prev,
-                          phone: e.target.value,
-                        }));
-                      }}
                     />
                     {errors.phone && (
                       <p className="text-red-500 text-sm mt-1">
@@ -182,10 +162,10 @@ export function SubscriptionForm() {
                       Kota *
                     </Label>
                     <Select
-                      onValueChange={(value) => {
-                        setValue("city", value);
-                        setFormData((prev) => ({ ...prev, city: value }));
-                      }}>
+                      onValueChange={(value) =>
+                        setValue("city", value, { shouldValidate: true })
+                      }
+                      value={watchedFields.city}>
                       <SelectTrigger className="mt-2 h-12">
                         <SelectValue placeholder="Pilih kota kamu" />
                       </SelectTrigger>
@@ -211,16 +191,10 @@ export function SubscriptionForm() {
                       Alamat Lengkap *
                     </Label>
                     <Input
+                      id="address"
                       {...register("address")}
                       placeholder="Jl. Contoh No. 123, RT/RW"
                       className="mt-2 h-12"
-                      onChange={(e) => {
-                        register("address").onChange(e);
-                        setFormData((prev) => ({
-                          ...prev,
-                          address: e.target.value,
-                        }));
-                      }}
                     />
                     {errors.address && (
                       <p className="text-red-500 text-sm mt-1">
@@ -232,19 +206,34 @@ export function SubscriptionForm() {
               </div>
 
               <PlanSelector
-                selectedPlan={formData.plan}
+                selectedPlan={watchedFields.plan}
                 onPlanChange={handlePlanChange}
               />
+              {errors.plan && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.plan.message}
+                </p>
+              )}
 
               <MealTypeSelector
-                selectedMealTypes={formData.mealTypes}
+                selectedMealTypes={watchedFields.mealTypes}
                 onMealTypeChange={handleMealTypeChange}
               />
+              {errors.mealTypes && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.mealTypes.message}
+                </p>
+              )}
 
               <DeliveryDaySelector
-                selectedDays={formData.deliveryDays}
+                selectedDays={watchedFields.deliveryDays}
                 onDayChange={handleDeliveryDayChange}
               />
+              {errors.deliveryDays && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.deliveryDays.message}
+                </p>
+              )}
 
               <div className="space-y-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -256,17 +245,11 @@ export function SubscriptionForm() {
                   </h3>
                 </div>
                 <Textarea
+                  id="allergies"
                   {...register("allergies")}
                   placeholder="Contoh: Alergi seafood, tidak suka pedas, vegetarian, dll. Kosongkan jika tidak ada."
                   rows={4}
                   className="resize-none"
-                  onChange={(e) => {
-                    register("allergies").onChange(e);
-                    setFormData((prev) => ({
-                      ...prev,
-                      allergies: e.target.value,
-                    }));
-                  }}
                 />
               </div>
 
@@ -282,9 +265,9 @@ export function SubscriptionForm() {
       </div>
 
       <PriceSummary
-        selectedPlan={formData.plan}
-        mealTypesCount={formData.mealTypes.length}
-        deliveryDaysCount={formData.deliveryDays.length}
+        selectedPlan={watchedFields.plan}
+        mealTypesCount={watchedFields.mealTypes.length}
+        deliveryDaysCount={watchedFields.deliveryDays.length}
         totalPrice={totalPrice}
       />
     </div>

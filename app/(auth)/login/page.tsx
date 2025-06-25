@@ -28,14 +28,14 @@ export default function LoginPage() {
               <p className="text-gray-600">
                 Belum punya akun?{" "}
                 <Link
-                  href="/auth/register"
+                  href="/register"
                   className="text-emerald-600 hover:text-emerald-700 font-semibold">
                   Daftar di sini
                 </Link>
               </p>
             </div>
 
-            {/* Demo Accounts */}
+            {}
             <div className="mt-8 p-4 bg-gray-50 rounded-lg">
               <p className="text-sm font-semibold text-gray-700 mb-2">
                 Demo Accounts:

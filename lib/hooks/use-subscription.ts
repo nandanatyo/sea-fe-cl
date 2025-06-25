@@ -1,10 +1,48 @@
+// lib/hooks/use-subscription.ts (UPDATED VERSION)
 import { useState, useEffect } from "react";
 import {
   subscriptionService,
   type CreateSubscriptionData,
 } from "@/lib/api/subscriptions";
-import { useToast } from "@/hooks/sonner";
+import { useToast } from "@/hooks/use-toast";
 import { Subscription } from "@/lib/types";
+
+// Mock data for demo purposes
+const mockSubscriptions: Subscription[] = [
+  {
+    id: "sub-1",
+    userId: "user-1",
+    name: "John Doe",
+    phone: "08123456789",
+    plan: "protein",
+    planName: "Protein Plan",
+    mealTypes: ["breakfast", "lunch"],
+    deliveryDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+    totalPrice: 1720000,
+    address: "Jl. Sudirman No. 123",
+    city: "jakarta",
+    status: "active",
+    createdAt: "2024-01-15T10:00:00Z",
+    updatedAt: "2024-01-15T10:00:00Z",
+  },
+  {
+    id: "sub-2",
+    userId: "user-1",
+    name: "John Doe",
+    phone: "08123456789",
+    plan: "diet",
+    planName: "Diet Plan",
+    mealTypes: ["lunch", "dinner"],
+    deliveryDays: ["saturday", "sunday"],
+    totalPrice: 1290000,
+    address: "Jl. Sudirman No. 123",
+    city: "jakarta",
+    status: "paused",
+    createdAt: "2023-12-01T10:00:00Z",
+    updatedAt: "2024-01-01T10:00:00Z",
+    pauseUntil: "2024-02-01T10:00:00Z",
+  },
+];
 
 export function useSubscription(userId?: string) {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -16,11 +54,19 @@ export function useSubscription(userId?: string) {
 
     try {
       setLoading(true);
-      const response = await subscriptionService.getUserSubscriptions(userId);
 
-      if (response.success && response.data) {
-        setSubscriptions(response.data);
-      }
+      // For demo purposes, use mock data
+      // In production, this would be:
+      // const response = await subscriptionService.getUserSubscriptions(userId);
+
+      // Simulate API delay
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Filter mock data by userId
+      const userSubscriptions = mockSubscriptions.filter(
+        (sub) => sub.userId === userId
+      );
+      setSubscriptions(userSubscriptions);
     } catch (error) {
       toast({
         title: "Gagal memuat langganan 😔",
@@ -39,18 +85,40 @@ export function useSubscription(userId?: string) {
   const createSubscription = async (data: CreateSubscriptionData) => {
     try {
       setLoading(true);
-      const response = await subscriptionService.create(data);
 
-      if (response.success) {
-        toast({
-          title: "Yeay! Langganan berhasil dibuat! 🎉",
-          description:
-            "Tim kami akan segera menghubungi kamu untuk konfirmasi.",
-        });
+      // For demo purposes, simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        await fetchSubscriptions();
-        return true;
-      }
+      // Create new subscription object
+      const newSubscription: Subscription = {
+        id: `sub-${Date.now()}`,
+        userId: userId || "user-1",
+        name: data.name,
+        phone: data.phone,
+        plan: data.plan,
+        planName:
+          data.plan.charAt(0).toUpperCase() + data.plan.slice(1) + " Plan",
+        mealTypes: data.mealTypes,
+        deliveryDays: data.deliveryDays,
+        totalPrice: data.totalPrice,
+        address: data.address,
+        city: data.city,
+        allergies: data.allergies,
+        status: "active",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Add to mock data
+      mockSubscriptions.push(newSubscription);
+
+      toast({
+        title: "Yeay! Langganan berhasil dibuat! 🎉",
+        description: "Tim kami akan segera menghubungi kamu untuk konfirmasi.",
+      });
+
+      await fetchSubscriptions();
+      return true;
     } catch (error) {
       toast({
         title: "Waduh, ada kendala teknis 😔",
@@ -64,23 +132,31 @@ export function useSubscription(userId?: string) {
     return false;
   };
 
-  const pauseSubscription = async (id: string, pauseUntil: Date) => {
+  const pauseSubscription = async (id: string, pauseUntil?: Date) => {
     try {
-      const response = await subscriptionService.pause(
-        id,
-        pauseUntil.toISOString()
+      // Find and update subscription
+      const subscriptionIndex = mockSubscriptions.findIndex(
+        (sub) => sub.id === id
       );
-
-      if (response.success) {
-        toast({
-          title: "Langganan berhasil dijeda! ⏸️",
-          description:
-            "Langganan akan otomatis aktif lagi sesuai tanggal yang dipilih.",
-        });
-
-        await fetchSubscriptions();
-        return true;
+      if (subscriptionIndex !== -1) {
+        mockSubscriptions[subscriptionIndex] = {
+          ...mockSubscriptions[subscriptionIndex],
+          status: "paused",
+          pauseUntil:
+            pauseUntil?.toISOString() ||
+            new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
       }
+
+      toast({
+        title: "Langganan berhasil dijeda! ⏸️",
+        description:
+          "Langganan akan otomatis aktif lagi sesuai tanggal yang dipilih.",
+      });
+
+      await fetchSubscriptions();
+      return true;
     } catch (error) {
       toast({
         title: "Gagal menjeda langganan 😔",
@@ -93,18 +169,27 @@ export function useSubscription(userId?: string) {
 
   const cancelSubscription = async (id: string) => {
     try {
-      const response = await subscriptionService.cancel(id);
-
-      if (response.success) {
-        toast({
-          title: "Langganan dibatalkan 😢",
-          description:
-            "Kami sedih kamu pergi. Semoga bisa kembali lagi suatu saat nanti!",
-        });
-
-        await fetchSubscriptions();
-        return true;
+      // Find and update subscription
+      const subscriptionIndex = mockSubscriptions.findIndex(
+        (sub) => sub.id === id
+      );
+      if (subscriptionIndex !== -1) {
+        mockSubscriptions[subscriptionIndex] = {
+          ...mockSubscriptions[subscriptionIndex],
+          status: "cancelled",
+          cancelledAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
       }
+
+      toast({
+        title: "Langganan dibatalkan 😢",
+        description:
+          "Kami sedih kamu pergi. Semoga bisa kembali lagi suatu saat nanti!",
+      });
+
+      await fetchSubscriptions();
+      return true;
     } catch (error) {
       toast({
         title: "Gagal membatalkan langganan 😔",
@@ -117,17 +202,27 @@ export function useSubscription(userId?: string) {
 
   const reactivateSubscription = async (id: string) => {
     try {
-      const response = await subscriptionService.reactivate(id);
-
-      if (response.success) {
-        toast({
-          title: "Selamat datang kembali! 🎉",
-          description: "Langganan sudah aktif lagi. Siap lanjut hidup sehat!",
-        });
-
-        await fetchSubscriptions();
-        return true;
+      // Find and update subscription
+      const subscriptionIndex = mockSubscriptions.findIndex(
+        (sub) => sub.id === id
+      );
+      if (subscriptionIndex !== -1) {
+        mockSubscriptions[subscriptionIndex] = {
+          ...mockSubscriptions[subscriptionIndex],
+          status: "active",
+          pauseUntil: undefined,
+          cancelledAt: undefined,
+          updatedAt: new Date().toISOString(),
+        };
       }
+
+      toast({
+        title: "Selamat datang kembali! 🎉",
+        description: "Langganan sudah aktif lagi. Siap lanjut hidup sehat!",
+      });
+
+      await fetchSubscriptions();
+      return true;
     } catch (error) {
       toast({
         title: "Gagal mengaktifkan langganan 😔",

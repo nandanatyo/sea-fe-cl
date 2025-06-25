@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +21,8 @@ import {
   subscriptionSchema,
   type SubscriptionFormData,
 } from "@/lib/validations/subscription";
-import { CITIES } from "@/lib/constants";
+import { CITIES, MEAL_PLANS } from "@/lib/constants";
+import { calculateSubscriptionPrice } from "@/lib/utils/calculations";
 import { PlanSelector } from "./plan-selector";
 import { MealTypeSelector } from "./meal-type-selector";
 import { DeliveryDaySelector } from "./delivery-day-selector";
@@ -51,6 +52,15 @@ export function SubscriptionForm() {
     defaultValues: formData,
   });
 
+  // Calculate total price
+  const totalPrice = useMemo(() => {
+    return calculateSubscriptionPrice(
+      formData.plan,
+      formData.mealTypes.length,
+      formData.deliveryDays.length
+    );
+  }, [formData.plan, formData.mealTypes.length, formData.deliveryDays.length]);
+
   const handleMealTypeChange = (mealTypeId: string, checked: boolean) => {
     const newMealTypes = checked
       ? [...formData.mealTypes, mealTypeId]
@@ -69,15 +79,15 @@ export function SubscriptionForm() {
     setValue("deliveryDays", newDeliveryDays);
   };
 
-  const calculateTotalPrice = () => {
-    // Calculation logic here
-    return 0;
+  const handlePlanChange = (planId: string) => {
+    setFormData((prev) => ({ ...prev, plan: planId }));
+    setValue("plan", planId);
   };
 
   const onSubmit = async (data: SubscriptionFormData) => {
     const success = await createSubscription({
       ...data,
-      totalPrice: calculateTotalPrice(),
+      totalPrice: Math.round(totalPrice),
     });
 
     if (success) {
@@ -127,6 +137,13 @@ export function SubscriptionForm() {
                       {...register("name")}
                       placeholder="Masukkan nama lengkap kamu"
                       className="mt-2 h-12"
+                      onChange={(e) => {
+                        register("name").onChange(e);
+                        setFormData((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                        }));
+                      }}
                     />
                     {errors.name && (
                       <p className="text-red-500 text-sm mt-1">
@@ -143,6 +160,13 @@ export function SubscriptionForm() {
                       {...register("phone")}
                       placeholder="08123456789"
                       className="mt-2 h-12"
+                      onChange={(e) => {
+                        register("phone").onChange(e);
+                        setFormData((prev) => ({
+                          ...prev,
+                          phone: e.target.value,
+                        }));
+                      }}
                     />
                     {errors.phone && (
                       <p className="text-red-500 text-sm mt-1">
@@ -157,7 +181,11 @@ export function SubscriptionForm() {
                     <Label htmlFor="city" className="text-base font-semibold">
                       Kota *
                     </Label>
-                    <Select onValueChange={(value) => setValue("city", value)}>
+                    <Select
+                      onValueChange={(value) => {
+                        setValue("city", value);
+                        setFormData((prev) => ({ ...prev, city: value }));
+                      }}>
                       <SelectTrigger className="mt-2 h-12">
                         <SelectValue placeholder="Pilih kota kamu" />
                       </SelectTrigger>
@@ -186,6 +214,13 @@ export function SubscriptionForm() {
                       {...register("address")}
                       placeholder="Jl. Contoh No. 123, RT/RW"
                       className="mt-2 h-12"
+                      onChange={(e) => {
+                        register("address").onChange(e);
+                        setFormData((prev) => ({
+                          ...prev,
+                          address: e.target.value,
+                        }));
+                      }}
                     />
                     {errors.address && (
                       <p className="text-red-500 text-sm mt-1">
@@ -198,10 +233,7 @@ export function SubscriptionForm() {
 
               <PlanSelector
                 selectedPlan={formData.plan}
-                onPlanChange={(planId) => {
-                  setFormData((prev) => ({ ...prev, plan: planId }));
-                  setValue("plan", planId);
-                }}
+                onPlanChange={handlePlanChange}
               />
 
               <MealTypeSelector
@@ -228,13 +260,20 @@ export function SubscriptionForm() {
                   placeholder="Contoh: Alergi seafood, tidak suka pedas, vegetarian, dll. Kosongkan jika tidak ada."
                   rows={4}
                   className="resize-none"
+                  onChange={(e) => {
+                    register("allergies").onChange(e);
+                    setFormData((prev) => ({
+                      ...prev,
+                      allergies: e.target.value,
+                    }));
+                  }}
                 />
               </div>
 
               <Button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 h-14 text-lg font-semibold shadow-lg hover:shadow-xl">
+                disabled={loading || totalPrice === 0}
+                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 h-14 text-lg font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed">
                 {loading ? "Memproses..." : "🎉 Buat Langganan Sekarang"}
               </Button>
             </form>
@@ -246,7 +285,7 @@ export function SubscriptionForm() {
         selectedPlan={formData.plan}
         mealTypesCount={formData.mealTypes.length}
         deliveryDaysCount={formData.deliveryDays.length}
-        totalPrice={calculateTotalPrice()}
+        totalPrice={totalPrice}
       />
     </div>
   );

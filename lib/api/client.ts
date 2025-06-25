@@ -35,19 +35,36 @@ class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Request failed");
+        throw new Error(data.error || data.message || "Request failed");
       }
 
-      return data;
+      return {
+        success: true,
+        data: data.data || data,
+        message: data.message,
+      };
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : "Unknown error");
+      console.error("API Request failed:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
   }
 
   private getAuthToken(): string | null {
     if (typeof window === "undefined") return null;
-    const user = localStorage.getItem("user");
-    return user ? JSON.parse(user).token : null;
+
+    try {
+      const user = localStorage.getItem("user");
+      if (user) {
+        const userData = JSON.parse(user);
+        return userData.token || null;
+      }
+      return localStorage.getItem("authToken");
+    } catch {
+      return null;
+    }
   }
 
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {

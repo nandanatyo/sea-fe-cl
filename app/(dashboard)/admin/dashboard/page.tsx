@@ -1,3 +1,4 @@
+// app/(dashboard)/admin/dashboard/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -17,56 +18,73 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/hooks/use-auth";
+import { adminService } from "@/lib/api/admin";
+import { subscriptionService } from "@/lib/api/subscriptions";
+import { AdminMetrics } from "@/lib/types";
+import { formatCurrency } from "@/lib/utils/format";
 
 export default function AdminDashboard() {
   const router = useRouter();
   const { toast } = useToast();
-  const [user, setUser] = useState(null);
+  const { user, logout, requireAdmin } = useAuth();
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(),
   });
-  const [metrics, setMetrics] = useState({
-    newSubscriptions: 0,
-    monthlyRecurringRevenue: 0,
+  const [metrics, setMetrics] = useState<AdminMetrics>({
+    active_subscriptions: 0,
+    new_subscriptions: 0,
+    monthly_recurring_revenue: 0,
     reactivations: 0,
-    subscriptionGrowth: 0,
-    totalActiveSubscriptions: 0,
-    totalUsers: 0,
-    conversionRate: 0,
-    churnRate: 0,
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const userData = localStorage.getItem("user");
-    if (!userData) {
-      router.push("/auth/login");
-      return;
-    }
-
-    const parsedUser = JSON.parse(userData);
-    if (parsedUser.role !== "admin") {
-      toast({
-        title: "Akses Ditolak 🚫",
-        description: "Kamu tidak memiliki akses ke halaman admin.",
-        variant: "destructive",
-      });
-      router.push("/dashboard");
-      return;
-    }
-
-    setUser(parsedUser);
+    if (!requireAdmin()) return;
     fetchMetrics();
   }, [dateRange]);
 
   const fetchMetrics = async () => {
     try {
-      const response = await fetch(
-        `/api/admin/metrics?from=${dateRange.from.toISOString()}&to=${dateRange.to.toISOString()}`
-      );
-      const data = await response.json();
-      setMetrics(data);
+      setLoading(true);
+
+      // Try to get filtered dashboard data first
+      const filterResponse = await adminService.getDashboardWithFilter({
+        start_date: dateRange.from.toISOString(),
+        end_date: dateRange.to.toISOString(),
+      });
+
+      if (filterResponse.success && filterResponse.data) {
+        setMetrics(filterResponse.data);
+      } else {
+        // Fallback to general dashboard data
+        const dashboardResponse = await adminService.getDashboard();
+        if (dashboardResponse.success && dashboardResponse.data) {
+          setMetrics(dashboardResponse.data);
+        } else {
+          // Fallback to subscription stats
+          const statsResponse = await subscriptionService.getStats({
+            start_date: dateRange.from.toISOString().split("T")[0],
+            end_date: dateRange.to.toISOString().split("T")[0],
+          });
+
+          if (statsResponse.success && statsResponse.data) {
+            // Map subscription stats to admin metrics format
+            setMetrics({
+              active_subscriptions: statsResponse.data.active_subscriptions,
+              new_subscriptions: statsResponse.data.total_subscriptions,
+              monthly_recurring_revenue:
+                statsResponse.data.monthly_recurring_revenue,
+              reactivations: statsResponse.data.reactivations || 0,
+              subscription_growth: 0, // Calculate if needed
+              conversion_rate: statsResponse.data.conversion_rate || 0,
+              churn_rate: statsResponse.data.churn_rate || 0,
+              total_users: 0, // Would need user management endpoint
+            });
+          }
+        }
+      }
     } catch (error) {
       console.error("Error fetching metrics:", error);
       toast({
@@ -77,19 +95,6 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    router.push("/");
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(amount);
   };
 
   const formatDate = (date: Date) => {
@@ -111,18 +116,22 @@ export default function AdminDashboard() {
     );
   }
 
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8 px-4">
       <div className="max-w-7xl mx-auto">
-        {}
+        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               Admin Dashboard 👑
             </h1>
             <p className="text-xl text-gray-600 mt-2">
-              Selamat datang, {user?.fullName}! Monitor performa SEA Catering di
-              sini.
+              Selamat datang, {user?.name || user?.fullName}! Monitor performa
+              SEA Catering di sini.
             </p>
           </div>
           <div className="flex gap-3">
@@ -132,14 +141,14 @@ export default function AdminDashboard() {
               <Users className="h-4 w-4 mr-2" />
               Kelola User
             </Button>
-            <Button variant="outline" onClick={handleLogout}>
+            <Button variant="outline" onClick={logout}>
               <LogOut className="h-4 w-4 mr-2" />
               Logout
             </Button>
           </div>
         </div>
 
-        {}
+        {/* Date Filter */}
         <Card className="shadow-lg border-0 mb-8">
           <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg">
             <CardTitle className="flex items-center gap-2">
@@ -166,7 +175,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {}
+        {/* Metrics Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="shadow-lg border-0 hover:shadow-xl transition-shadow">
             <CardContent className="p-6">
@@ -176,7 +185,7 @@ export default function AdminDashboard() {
                     Langganan Baru
                   </p>
                   <p className="text-3xl font-bold text-green-600">
-                    {metrics.newSubscriptions}
+                    {metrics.new_subscriptions || 0}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     dalam periode ini
@@ -197,7 +206,7 @@ export default function AdminDashboard() {
                     Monthly Recurring Revenue
                   </p>
                   <p className="text-3xl font-bold text-blue-600">
-                    {formatCurrency(metrics.monthlyRecurringRevenue)}
+                    {formatCurrency(metrics.monthly_recurring_revenue || 0)}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     pendapatan bulanan
@@ -218,7 +227,7 @@ export default function AdminDashboard() {
                     Reaktivasi
                   </p>
                   <p className="text-3xl font-bold text-purple-600">
-                    {metrics.reactivations}
+                    {metrics.reactivations || 0}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     langganan kembali aktif
@@ -239,7 +248,9 @@ export default function AdminDashboard() {
                     Total Langganan Aktif
                   </p>
                   <p className="text-3xl font-bold text-orange-600">
-                    {metrics.totalActiveSubscriptions}
+                    {metrics.active_subscriptions ||
+                      metrics.totalActiveSubscriptions ||
+                      0}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">saat ini</p>
                 </div>
@@ -251,7 +262,7 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {}
+        {/* Analytics Cards */}
         <div className="grid lg:grid-cols-2 gap-8 mb-8">
           <Card className="shadow-lg border-0">
             <CardHeader>
@@ -268,13 +279,13 @@ export default function AdminDashboard() {
                   </span>
                   <Badge
                     variant={
-                      metrics.subscriptionGrowth >= 0
+                      (metrics.subscription_growth || 0) >= 0
                         ? "default"
                         : "destructive"
                     }
                     className="text-lg px-3 py-1">
-                    {metrics.subscriptionGrowth >= 0 ? "+" : ""}
-                    {metrics.subscriptionGrowth}%
+                    {(metrics.subscription_growth || 0) >= 0 ? "+" : ""}
+                    {metrics.subscription_growth || 0}%
                   </Badge>
                 </div>
                 <div className="flex justify-between items-center">
@@ -282,19 +293,19 @@ export default function AdminDashboard() {
                     Total pengguna terdaftar:
                   </span>
                   <span className="font-bold text-xl">
-                    {metrics.totalUsers}
+                    {metrics.total_users || metrics.totalUsers || 0}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Conversion rate:</span>
                   <span className="font-bold text-xl text-green-600">
-                    {metrics.conversionRate}%
+                    {metrics.conversion_rate || metrics.conversionRate || 0}%
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Churn rate:</span>
                   <span className="font-bold text-xl text-red-600">
-                    {metrics.churnRate}%
+                    {metrics.churn_rate || metrics.churnRate || 0}%
                   </span>
                 </div>
               </div>
@@ -315,12 +326,17 @@ export default function AdminDashboard() {
                     📈 Performa Bulan Ini
                   </h4>
                   <div className="text-sm text-green-700 space-y-1">
-                    <p>• {metrics.newSubscriptions} pelanggan baru bergabung</p>
+                    <p>
+                      • {metrics.new_subscriptions || 0} pelanggan baru
+                      bergabung
+                    </p>
                     <p>
                       • Revenue meningkat{" "}
-                      {formatCurrency(metrics.monthlyRecurringRevenue)}
+                      {formatCurrency(metrics.monthly_recurring_revenue || 0)}
                     </p>
-                    <p>• {metrics.reactivations} pelanggan kembali aktif</p>
+                    <p>
+                      • {metrics.reactivations || 0} pelanggan kembali aktif
+                    </p>
                   </div>
                 </div>
 
@@ -331,13 +347,15 @@ export default function AdminDashboard() {
                   <div className="text-sm text-blue-700 space-y-1">
                     <p>• Target bulanan: 100 langganan baru</p>
                     <p>
-                      • Pencapaian: {metrics.newSubscriptions}/100 (
-                      {Math.round((metrics.newSubscriptions / 100) * 100)}
+                      • Pencapaian: {metrics.new_subscriptions || 0}/100 (
+                      {Math.round(
+                        ((metrics.new_subscriptions || 0) / 100) * 100
+                      )}
                       %)
                     </p>
                     <p>
                       • Status:{" "}
-                      {metrics.newSubscriptions >= 100
+                      {(metrics.new_subscriptions || 0) >= 100
                         ? "✅ Target tercapai!"
                         : "🔥 Terus semangat!"}
                     </p>
@@ -349,9 +367,9 @@ export default function AdminDashboard() {
                     💡 Insight
                   </h4>
                   <div className="text-sm text-purple-700">
-                    {metrics.subscriptionGrowth > 10
+                    {(metrics.subscription_growth || 0) > 10
                       ? "Pertumbuhan sangat baik! Pertahankan strategi marketing saat ini."
-                      : metrics.subscriptionGrowth > 0
+                      : (metrics.subscription_growth || 0) > 0
                       ? "Pertumbuhan stabil. Coba tingkatkan engagement dengan pelanggan."
                       : "Perlu evaluasi strategi. Fokus pada retention dan customer satisfaction."}
                   </div>
@@ -361,7 +379,7 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {}
+        {/* Activity Feed */}
         <Card className="shadow-lg border-0">
           <CardHeader>
             <CardTitle>Aktivitas Terbaru 📊</CardTitle>

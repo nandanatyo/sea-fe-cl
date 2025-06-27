@@ -1,23 +1,55 @@
+// components/navigation.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, User, Heart } from "lucide-react";
+import { Menu, User, Heart, LogOut, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/hooks/use-auth";
 
 const navigation = [
   { name: "🏠 Beranda", href: "/" },
   { name: "🍽️ Menu", href: "/menu" },
   { name: "📝 Langganan", href: "/subscription" },
-  { name: "💬 Kontak", href: "/contact" },
+  { name: "💬 Testimoni", href: "/testimonial" },
+  { name: "📞 Kontak", href: "/contact" },
 ];
 
 export function Navigation() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const { user, logout, isAuthenticated, isAdmin } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Don't render until mounted to avoid hydration issues
+  if (!mounted) {
+    return (
+      <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 shadow-sm">
+        <div className="container flex h-20 items-center justify-between px-6">
+          <Link href="/" className="flex items-center space-x-3 group">
+            <div className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white p-3 rounded-2xl shadow-lg">
+              <Heart className="h-6 w-6" />
+            </div>
+            <div>
+              <span className="font-bold text-2xl bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                SEA Catering
+              </span>
+              <div className="text-xs text-gray-500 -mt-1">
+                Makanan Sehat Indonesia
+              </div>
+            </div>
+          </Link>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 shadow-sm">
@@ -36,7 +68,7 @@ export function Navigation() {
           </div>
         </Link>
 
-        {}
+        {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-8">
           {navigation.map((item) => (
             <Link
@@ -53,32 +85,55 @@ export function Navigation() {
           ))}
         </nav>
 
+        {/* Desktop Auth */}
         <div className="hidden md:flex items-center space-x-4">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="text-gray-600 hover:text-emerald-600">
-            <Link href="/login">
-              {" "}
-              {}
-              <User className="h-4 w-4 mr-2" />
-              Masuk
-            </Link>
-          </Button>
-          <Button
-            asChild
-            size="sm"
-            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl">
-            <Link href="/register">
-              {" "}
-              {}
-              🚀 Daftar Sekarang
-            </Link>
-          </Button>
+          {isAuthenticated ? (
+            <>
+              <span className="text-sm text-gray-600">
+                Halo, {user?.name || user?.fullName}!
+              </span>
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="text-gray-600 hover:text-emerald-600">
+                <Link href={isAdmin ? "/admin/dashboard" : "/dashboard"}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  {isAdmin ? "Admin Panel" : "Dashboard"}
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={logout}
+                className="text-red-600 border-red-200 hover:bg-red-50">
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="text-gray-600 hover:text-emerald-600">
+                <Link href="/login">
+                  <User className="h-4 w-4 mr-2" />
+                  Masuk
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl">
+                <Link href="/register">🚀 Daftar Sekarang</Link>
+              </Button>
+            </>
+          )}
         </div>
 
-        {}
+        {/* Mobile Navigation */}
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild className="md:hidden">
             <Button variant="ghost" size="sm">
@@ -94,6 +149,11 @@ export function Navigation() {
                 <div className="text-sm text-gray-500">
                   Makanan Sehat Indonesia
                 </div>
+                {isAuthenticated && (
+                  <div className="text-sm text-gray-600 mt-2">
+                    Halo, {user?.name || user?.fullName}!
+                  </div>
+                )}
               </div>
 
               {navigation.map((item) => (
@@ -112,26 +172,50 @@ export function Navigation() {
               ))}
 
               <div className="border-t pt-6 space-y-3">
-                <Button
-                  asChild
-                  variant="ghost"
-                  className="w-full justify-start text-left">
-                  <Link href="/login" onClick={() => setIsOpen(false)}>
-                    {" "}
-                    {}
-                    <User className="h-4 w-4 mr-2" />
-                    Masuk ke Akun
-                  </Link>
-                </Button>
-                <Button
-                  asChild
-                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700">
-                  <Link href="/register" onClick={() => setIsOpen(false)}>
-                    {" "}
-                    {}
-                    🚀 Daftar Sekarang
-                  </Link>
-                </Button>
+                {isAuthenticated ? (
+                  <>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      className="w-full justify-start text-left">
+                      <Link
+                        href={isAdmin ? "/admin/dashboard" : "/dashboard"}
+                        onClick={() => setIsOpen(false)}>
+                        <Settings className="h-4 w-4 mr-2" />
+                        {isAdmin ? "Admin Panel" : "Dashboard Saya"}
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => {
+                        logout();
+                        setIsOpen(false);
+                      }}>
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Logout
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      className="w-full justify-start text-left">
+                      <Link href="/login" onClick={() => setIsOpen(false)}>
+                        <User className="h-4 w-4 mr-2" />
+                        Masuk ke Akun
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700">
+                      <Link href="/register" onClick={() => setIsOpen(false)}>
+                        🚀 Daftar Sekarang
+                      </Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </SheetContent>

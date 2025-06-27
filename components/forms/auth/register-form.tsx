@@ -1,10 +1,11 @@
+// components/forms/auth/register-form.tsx
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Mail, Lock, XCircle } from "lucide-react";
+import { User, Mail, Lock, XCircle, Phone } from "lucide-react";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useFormValidation } from "@/lib/hooks/use-form-validation";
 import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
@@ -14,6 +15,7 @@ import { PasswordRequirements } from "./password-requirements";
 const initialValues: RegisterFormData = {
   fullName: "",
   email: "",
+  phone: "",
   password: "",
   confirmPassword: "",
 };
@@ -49,9 +51,11 @@ export function RegisterForm() {
       return;
     }
 
+    // Convert form data to match backend expectations
     await registerUser({
       fullName: values.fullName,
       email: values.email,
+      phone: values.phone,
       password: values.password,
     });
   };
@@ -99,6 +103,25 @@ export function RegisterForm() {
 
       <div>
         <Label
+          htmlFor="phone"
+          className="text-base font-semibold flex items-center gap-2">
+          <Phone className="h-4 w-4" />
+          Nomor WhatsApp *
+        </Label>
+        <Input
+          id="phone"
+          value={values.phone}
+          onChange={(e) => setValue("phone", e.target.value)}
+          placeholder="08123456789"
+          className="mt-2 h-12"
+        />
+        {errors.phone && (
+          <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
+        )}
+      </div>
+
+      <div>
+        <Label
           htmlFor="password"
           className="text-base font-semibold flex items-center gap-2">
           <Lock className="h-4 w-4" />
@@ -140,7 +163,10 @@ export function RegisterForm() {
         disabled={
           loading ||
           !isPasswordValid() ||
-          values.password !== values.confirmPassword
+          values.password !== values.confirmPassword ||
+          !values.fullName ||
+          !values.email ||
+          !values.phone
         }
         className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 h-12 text-lg font-semibold">
         {loading ? "Mendaftarkan..." : "🎉 Daftar Sekarang"}

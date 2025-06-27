@@ -1,14 +1,16 @@
+// components/forms/subscription/price-summary.tsx
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calculator, Shield, Truck, Heart } from "lucide-react";
-import { MEAL_PLANS } from "@/lib/constants";
+import { Plan } from "@/lib/types";
 
 interface PriceSummaryProps {
   selectedPlan: string;
   mealTypesCount: number;
   deliveryDaysCount: number;
   totalPrice: number;
+  availablePlans?: Plan[];
 }
 
 export function PriceSummary({
@@ -16,8 +18,9 @@ export function PriceSummary({
   mealTypesCount,
   deliveryDaysCount,
   totalPrice,
+  availablePlans = [],
 }: PriceSummaryProps) {
-  const plan = MEAL_PLANS.find((p) => p.id === selectedPlan);
+  const plan = availablePlans.find((p) => p.id === selectedPlan);
 
   return (
     <Card className="sticky top-24 shadow-2xl border-0">

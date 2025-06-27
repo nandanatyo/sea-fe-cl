@@ -1,3 +1,4 @@
+// lib/validations/auth.ts
 import { z } from "zod";
 
 export const loginSchema = z.object({
@@ -18,6 +19,13 @@ export const registerSchema = z
       .string()
       .min(1, "Email wajib diisi")
       .email("Format email tidak valid"),
+    phone: z
+      .string()
+      .min(1, "Nomor HP wajib diisi")
+      .regex(
+        /^08[0-9]{8,11}$/,
+        "Format nomor HP tidak valid (contoh: 08123456789)"
+      ),
     password: z
       .string()
       .min(8, "Password minimal 8 karakter")

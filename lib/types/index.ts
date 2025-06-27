@@ -1,11 +1,16 @@
+// lib/types/index.ts
 export interface User {
   id: string;
-  fullName: string;
+  name?: string; // Backend uses 'name'
+  fullName?: string; // Frontend compatibility
   email: string;
-  role: "admin" | "user";
   phone?: string;
-  createdAt: string;
-  updatedAt: string;
+  role: "admin" | "user";
+  is_active?: boolean;
+  email_verified?: boolean;
+  created_at: string;
+  updated_at: string;
+  image_url?: string;
 }
 
 export interface Plan {
@@ -26,47 +31,88 @@ export interface Plan {
   badge: string;
 }
 
+// Backend meal plan structure
+export interface MealPlan {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  image_url?: string;
+  features: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Subscription {
   id: string;
-  userId: string;
+  user_id?: string;
+  userId?: string; // Frontend compatibility
   name: string;
-  phone: string;
-  plan: string;
-  planName: string;
-  mealTypes: string[];
-  deliveryDays: string[];
-  totalPrice: number;
+  phone_number?: string;
+  phone?: string; // Frontend compatibility
+  meal_plan_id: string;
+  plan?: string; // Frontend compatibility
+  planName?: string; // Frontend compatibility
+  meal_types: string[];
+  mealTypes?: string[]; // Frontend compatibility
+  delivery_days: string[];
+  deliveryDays?: string[]; // Frontend compatibility
+  total_price?: number;
+  totalPrice?: number; // Frontend compatibility
   allergies?: string;
-  address: string;
-  city: string;
+  address?: string;
+  city?: string;
   status: "active" | "paused" | "cancelled";
-  createdAt: string;
-  updatedAt: string;
-  pauseUntil?: string;
-  cancelledAt?: string;
+  created_at: string;
+  createdAt?: string; // Frontend compatibility
+  updated_at: string;
+  updatedAt?: string; // Frontend compatibility
+  pause_start?: string;
+  pause_end?: string;
+  pauseUntil?: string; // Frontend compatibility
+  cancelled_at?: string;
+  cancelledAt?: string; // Frontend compatibility
+  next_delivery?: string;
+  payment_status?: "pending" | "paid" | "failed";
 }
 
 export interface Testimonial {
   id: string;
-  customerName: string;
+  customer_name: string;
+  customerName?: string; // Frontend compatibility
   email: string;
   plan: string;
-  reviewMessage: string;
+  message?: string;
+  reviewMessage?: string; // Frontend compatibility
   rating: number;
   location: string;
   approved: boolean;
-  createdAt: string;
+  is_approved?: boolean; // Backend field
+  created_at: string;
+  createdAt?: string; // Frontend compatibility
+  updated_at?: string;
 }
 
 export interface AdminMetrics {
-  newSubscriptions: number;
-  monthlyRecurringRevenue: number;
-  reactivations: number;
-  subscriptionGrowth: number;
-  totalActiveSubscriptions: number;
-  totalUsers: number;
-  conversionRate: number;
-  churnRate: number;
+  total_users?: number;
+  totalUsers?: number; // Frontend compatibility
+  active_subscriptions: number;
+  totalActiveSubscriptions?: number; // Frontend compatibility
+  new_subscriptions: number;
+  newSubscriptions?: number; // Frontend compatibility
+  monthly_recurring_revenue: number;
+  monthlyRecurringRevenue?: number; // Frontend compatibility
+  total_revenue?: number;
+  reactivations?: number;
+  subscription_growth?: number;
+  subscriptionGrowth?: number; // Frontend compatibility
+  conversion_rate?: number;
+  conversionRate?: number; // Frontend compatibility
+  churn_rate?: number;
+  churnRate?: number; // Frontend compatibility
+  cancelled_subscriptions?: number;
+  paused_subscriptions?: number;
 }
 
 export interface ApiResponse<T> {
@@ -77,10 +123,92 @@ export interface ApiResponse<T> {
 }
 
 export interface PaginatedResponse<T> extends ApiResponse<T[]> {
-  pagination: {
+  pagination?: {
     page: number;
     limit: number;
     total: number;
     pages: number;
   };
+  // Alternative pagination structure that might come from backend
+  meta?: {
+    current_page: number;
+    per_page: number;
+    total: number;
+    last_page: number;
+  };
 }
+
+// Payment webhook data structure
+export interface PaymentWebhookData {
+  transaction_time: string;
+  transaction_status: string;
+  transaction_id: string;
+  status_message: string;
+  status_code: string;
+  signature_key: string;
+  payment_type: string;
+  order_id: string;
+  merchant_id: string;
+  gross_amount: string;
+  fraud_status: string;
+  currency: string;
+}
+
+// Form data types for better type safety
+export interface CreateSubscriptionFormData {
+  name: string;
+  phone: string;
+  plan: string;
+  mealTypes: string[];
+  deliveryDays: string[];
+  allergies?: string;
+  address: string;
+  city: string;
+  totalPrice: number;
+}
+
+// Convert frontend form data to backend API format
+export const convertSubscriptionFormData = (
+  formData: CreateSubscriptionFormData
+) => ({
+  name: formData.name,
+  phone_number: formData.phone,
+  meal_plan_id: formData.plan,
+  meal_types: formData.mealTypes,
+  delivery_days: formData.deliveryDays,
+  allergies: formData.allergies || "",
+});
+
+// Convert backend subscription to frontend format
+export const convertSubscriptionFromBackend = (
+  subscription: any
+): Subscription => ({
+  ...subscription,
+  userId: subscription.user_id,
+  phone: subscription.phone_number,
+  plan: subscription.meal_plan_id,
+  mealTypes: subscription.meal_types,
+  deliveryDays: subscription.delivery_days,
+  totalPrice: subscription.total_price,
+  createdAt: subscription.created_at,
+  updatedAt: subscription.updated_at,
+  pauseUntil: subscription.pause_end,
+  cancelledAt: subscription.cancelled_at,
+});
+
+// Convert backend user to frontend format
+export const convertUserFromBackend = (user: any): User => ({
+  ...user,
+  fullName: user.name || user.fullName,
+});
+
+// Convert backend testimonial to frontend format
+export const convertTestimonialFromBackend = (
+  testimonial: any
+): Testimonial => ({
+  ...testimonial,
+  customerName: testimonial.customer_name,
+  reviewMessage: testimonial.message,
+  approved: testimonial.is_approved ?? testimonial.approved,
+  createdAt: testimonial.created_at,
+});

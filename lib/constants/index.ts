@@ -1,3 +1,4 @@
+// lib/constants/index.ts
 import { Plan } from "@/lib/types";
 
 export const MEAL_PLANS: Plan[] = [
@@ -107,24 +108,81 @@ export const CITIES = [
   { value: "palembang", label: "🌉 Palembang" },
 ];
 
+// Updated API endpoints to match backend
 export const API_ENDPOINTS = {
   AUTH: {
-    LOGIN: "/api/auth/login",
-    REGISTER: "/api/auth/register",
-    LOGOUT: "/api/auth/logout",
-    REFRESH: "/api/auth/refresh",
+    LOGIN: "/auth/login",
+    REGISTER: "/auth/register",
+    LOGOUT: "/auth/logout",
+    REFRESH: "/auth/refresh",
+    SEND_OTP: "/auth/send-otp",
+    VERIFY_OTP: "/auth/verify-otp",
+    FORGOT_PASSWORD: "/auth/forgot-password",
+    RESET_PASSWORD: "/auth/reset-password",
+  },
+  USER: {
+    PROFILE: "/user/profile",
+    CHANGE_PASSWORD: "/user/change-password",
+    UPLOAD_IMAGE: "/user/profile/image",
+  },
+  MEAL_PLANS: {
+    BASE: "/meal-plans",
+    ACTIVE: "/meal-plans/active",
+    SEARCH: "/meal-plans/search",
+    POPULAR: "/meal-plans/popular",
+    BY_ID: (id: string) => `/meal-plans/${id}`,
+    // Admin endpoints
+    ADMIN: {
+      BASE: "/meal-plans/admin",
+      BY_ID: (id: string) => `/meal-plans/admin/${id}`,
+      ACTIVATE: (id: string) => `/meal-plans/admin/${id}/activate`,
+      DEACTIVATE: (id: string) => `/meal-plans/admin/${id}/deactivate`,
+      BULK_STATUS: "/meal-plans/admin/bulk-status",
+      STATS: "/meal-plans/admin/stats",
+    },
   },
   SUBSCRIPTIONS: {
-    BASE: "/api/subscriptions",
-    PAUSE: (id: string) => `/api/subscriptions/${id}/pause`,
-    CANCEL: (id: string) => `/api/subscriptions/${id}/cancel`,
-    REACTIVATE: (id: string) => `/api/subscriptions/${id}/reactivate`,
+    BASE: "/subscriptions",
+    MY: "/subscriptions/my",
+    BY_ID: (id: string) => `/subscriptions/${id}`,
+    PAUSE: (id: string) => `/subscriptions/${id}/pause`,
+    RESUME: (id: string) => `/subscriptions/${id}/resume`,
+    CANCEL: (id: string) => `/subscriptions/${id}`,
+    WEBHOOK_PAYMENT: "/subscriptions/webhook/payment",
+    // Admin endpoints
+    ADMIN: {
+      STATS: "/subscriptions/admin/stats",
+      ALL: "/subscriptions/admin/all",
+      PROCESS_EXPIRED: "/subscriptions/admin/process-expired",
+      SEARCH: "/subscriptions/admin/search",
+      FORCE_CANCEL: (id: string) => `/subscriptions/admin/${id}/force-cancel`,
+    },
+  },
+  TESTIMONIALS: {
+    BASE: "/testimonials",
+    // Admin endpoints
+    ADMIN: {
+      ALL: "/testimonials/admin/all",
+      APPROVE: (id: string) => `/testimonials/admin/${id}/approve`,
+      REJECT: (id: string) => `/testimonials/admin/${id}/reject`,
+      DELETE: (id: string) => `/testimonials/admin/${id}`,
+    },
   },
   ADMIN: {
-    METRICS: "/api/admin/metrics",
-    USERS: "/api/admin/users",
+    LOGIN: "/admin/login",
+    DASHBOARD: "/admin/dashboard",
+    DASHBOARD_FILTER: "/admin/dashboard/filter",
+    TESTIMONIALS: {
+      APPROVE: (id: string) => `/admin/testimonials/${id}/approve`,
+      REJECT: (id: string) => `/admin/testimonials/${id}/reject`,
+    },
   },
-  TESTIMONIALS: "/api/testimonials",
+  USER_MANAGEMENT: {
+    ALL: "/api/v1/admin/users",
+    BY_ID: (id: string) => `/api/v1/admin/users/${id}`,
+    STATUS: (id: string) => `/api/v1/admin/users/${id}/status`,
+    DELETE: (id: string) => `/api/v1/admin/users/${id}`,
+  },
 } as const;
 
 export const ROUTES = {
@@ -132,9 +190,10 @@ export const ROUTES = {
   MENU: "/menu",
   SUBSCRIPTION: "/subscription",
   CONTACT: "/contact",
+  TESTIMONIAL: "/testimonial",
   AUTH: {
-    LOGIN: "/login", // Changed from /auth/login
-    REGISTER: "/register", // Changed from /auth/register
+    LOGIN: "/login",
+    REGISTER: "/register",
   },
   DASHBOARD: {
     USER: "/dashboard",

@@ -1,3 +1,4 @@
+// components/forms/testimonial/testimonial-form.tsx
 "use client";
 
 import { useState } from "react";
@@ -17,6 +18,10 @@ import {
 } from "@/components/ui/select";
 import { Star, Send, Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  testimonialService,
+  type CreateTestimonialData,
+} from "@/lib/api/testimonials";
 import {
   testimonialSchema,
   type TestimonialFormData,
@@ -49,20 +54,19 @@ export function TestimonialForm({ onSuccess }: TestimonialFormProps) {
     try {
       setLoading(true);
 
-      const response = await fetch("/api/testimonials", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...data,
-          rating: selectedRating,
-        }),
-      });
+      // Convert frontend form data to backend format
+      const backendData: CreateTestimonialData = {
+        customer_name: data.customerName,
+        email: data.email,
+        plan: data.plan,
+        location: data.location,
+        message: data.reviewMessage,
+        rating: selectedRating,
+      };
 
-      const result = await response.json();
+      const response = await testimonialService.create(backendData);
 
-      if (response.ok) {
+      if (response.success) {
         toast({
           title: "Testimoni berhasil dikirim! 🎉",
           description:
@@ -72,13 +76,17 @@ export function TestimonialForm({ onSuccess }: TestimonialFormProps) {
         setSelectedRating(0);
         onSuccess?.();
       } else {
-        throw new Error(result.error || "Gagal mengirim testimoni");
+        toast({
+          title: "Gagal mengirim testimoni 😔",
+          description:
+            response.error || "Terjadi kesalahan saat mengirim testimoni",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       toast({
         title: "Gagal mengirim testimoni 😔",
-        description:
-          error instanceof Error ? error.message : "Terjadi kesalahan",
+        description: "Terjadi kesalahan pada server",
         variant: "destructive",
       });
     } finally {
@@ -105,7 +113,7 @@ export function TestimonialForm({ onSuccess }: TestimonialFormProps) {
       </CardHeader>
       <CardContent className="p-8">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {}
+          {/* Personal Information */}
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <Label htmlFor="customerName" className="text-base font-semibold">
@@ -141,7 +149,7 @@ export function TestimonialForm({ onSuccess }: TestimonialFormProps) {
             </div>
           </div>
 
-          {}
+          {/* Plan and Location */}
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <Label htmlFor="plan" className="text-base font-semibold">
@@ -190,7 +198,7 @@ export function TestimonialForm({ onSuccess }: TestimonialFormProps) {
             </div>
           </div>
 
-          {}
+          {/* Rating */}
           <div>
             <Label className="text-base font-semibold">
               Rating Pengalaman *
@@ -235,7 +243,7 @@ export function TestimonialForm({ onSuccess }: TestimonialFormProps) {
             )}
           </div>
 
-          {}
+          {/* Review Message */}
           <div>
             <Label htmlFor="reviewMessage" className="text-base font-semibold">
               Ceritakan Pengalaman Kamu *
@@ -261,7 +269,7 @@ export function TestimonialForm({ onSuccess }: TestimonialFormProps) {
             )}
           </div>
 
-          {}
+          {/* Terms */}
           <div className="bg-blue-50 p-4 rounded-lg">
             <h4 className="font-semibold text-blue-800 mb-2">
               📝 Ketentuan Testimoni:

@@ -1,90 +1,173 @@
+// lib/api/auth.ts
 import { apiClient } from "./client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { User, ApiResponse } from "@/lib/types";
 
 export interface LoginData {
-  email: string;
+  phone?: string; // Backend uses phone for login
+  email?: string; // Support both email and phone
   password: string;
 }
 
 export interface RegisterData {
-  fullName: string;
-  email: string;
+  name: string; // Backend uses 'name' instead of 'fullName'
+  phone: string;
   password: string;
+  email: string;
+}
+
+export interface RegisterFormData {
+  fullName: string; // Frontend form field
+  phone: string;
+  password: string;
+  email: string;
 }
 
 export interface AuthResponse {
   user: User;
-  message: string;
+  access_token: string;
+  message?: string;
+}
+
+export interface SendOTPData {
+  email: string;
+  type: "email_verification" | "password_reset";
+}
+
+export interface VerifyOTPData {
+  email: string;
+  otp: string;
+  type: "email_verification" | "password_reset";
+}
+
+export interface ForgotPasswordData {
+  phone: string;
+}
+
+export interface ResetPasswordData {
+  phone: string;
+  otp: string;
+  new_password: string;
 }
 
 export const authService = {
   async login(data: LoginData): Promise<ApiResponse<AuthResponse>> {
     try {
-      const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
+      const response = await apiClient.post<AuthResponse>(
+        API_ENDPOINTS.AUTH.LOGIN,
+        data
+      );
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        return {
-          success: false,
-          error: result.error || "Login gagal",
-        };
+      if (response.success && response.data) {
+        // Store access token and user data
+        localStorage.setItem("access_token", response.data.access_token);
+        localStorage.setItem("user", JSON.stringify(response.data.user));
       }
 
-      localStorage.setItem("user", JSON.stringify(result.user));
-
-      return {
-        success: true,
-        data: {
-          user: result.user,
-          message: result.message,
-        },
-      };
+      return response;
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Terjadi kesalahan",
+        error: error instanceof Error ? error.message : "Login failed",
       };
     }
   },
 
   async register(data: RegisterData): Promise<ApiResponse<AuthResponse>> {
     try {
-      const response = await fetch(API_ENDPOINTS.AUTH.REGISTER, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
+      const response = await apiClient.post<AuthResponse>(
+        API_ENDPOINTS.AUTH.REGISTER,
+        data
+      );
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        return {
-          success: false,
-          error: result.error || "Registrasi gagal",
-        };
+      if (response.success && response.data) {
+        // Auto login after registration
+        localStorage.setItem("access_token", response.data.access_token);
+        localStorage.setItem("user", JSON.stringify(response.data.user));
       }
 
-      return {
-        success: true,
-        data: {
-          user: result.user,
-          message: result.message,
-        },
-      };
+      return response;
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Terjadi kesalahan",
+        error: error instanceof Error ? error.message : "Registration failed",
+      };
+    }
+  },
+
+  async refreshToken(refreshToken: string): Promise<ApiResponse<AuthResponse>> {
+    try {
+      const response = await apiClient.post<AuthResponse>(
+        API_ENDPOINTS.AUTH.REFRESH,
+        {
+          refresh_token: refreshToken,
+        }
+      );
+
+      if (response.success && response.data) {
+        localStorage.setItem("access_token", response.data.access_token);
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+      }
+
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Token refresh failed",
+      };
+    }
+  },
+
+  async sendOTP(data: SendOTPData): Promise<ApiResponse<void>> {
+    try {
+      return await apiClient.post<void>(API_ENDPOINTS.AUTH.SEND_OTP, data);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to send OTP",
+      };
+    }
+  },
+
+  async verifyOTP(data: VerifyOTPData): Promise<ApiResponse<void>> {
+    try {
+      return await apiClient.post<void>(API_ENDPOINTS.AUTH.VERIFY_OTP, data);
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "OTP verification failed",
+      };
+    }
+  },
+
+  async forgotPassword(data: ForgotPasswordData): Promise<ApiResponse<void>> {
+    try {
+      return await apiClient.post<void>(
+        API_ENDPOINTS.AUTH.FORGOT_PASSWORD,
+        data
+      );
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to process forgot password",
+      };
+    }
+  },
+
+  async resetPassword(data: ResetPasswordData): Promise<ApiResponse<void>> {
+    try {
+      return await apiClient.post<void>(
+        API_ENDPOINTS.AUTH.RESET_PASSWORD,
+        data
+      );
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Password reset failed",
       };
     }
   },
@@ -94,26 +177,27 @@ export const authService = {
       this.removeAuthToken();
       return {
         success: true,
-        message: "Logout berhasil",
+        message: "Logout successful",
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Logout gagal",
+        error: error instanceof Error ? error.message : "Logout failed",
       };
     }
   },
 
   setAuthToken(token: string): void {
     if (typeof window !== "undefined") {
-      localStorage.setItem("authToken", token);
+      localStorage.setItem("access_token", token);
     }
   },
 
   removeAuthToken(): void {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("authToken");
+      localStorage.removeItem("access_token");
       localStorage.removeItem("user");
+      localStorage.removeItem("refresh_token");
     }
   },
 
@@ -126,5 +210,15 @@ export const authService = {
     } catch {
       return null;
     }
+  },
+
+  getAccessToken(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("access_token");
+  },
+
+  getRefreshToken(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("refresh_token");
   },
 };

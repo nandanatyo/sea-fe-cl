@@ -1,12 +1,8 @@
 // lib/hooks/use-auth.ts
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  authService,
-  adminService,
-  type LoginData,
-  type RegisterData,
-} from "@/lib/api/auth";
+import { authService, type LoginData, type RegisterData } from "@/lib/api/auth";
+import { adminService } from "@/lib/api/admin";
 import { useToast } from "@/hooks/use-toast";
 import { User, convertUserFromBackend } from "@/lib/types";
 import { ROUTES } from "@/lib/constants";

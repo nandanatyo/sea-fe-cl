@@ -1,7 +1,8 @@
-// lib/api/subscriptions.ts
+// lib/api/subscriptions.ts - Updated with success notifications
 import { apiClient } from "./client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Subscription, ApiResponse, PaginatedResponse } from "@/lib/types";
+import { notifications } from "@/lib/utils/notifications";
 
 export interface CreateSubscriptionData {
   name: string;
@@ -57,10 +58,20 @@ export const subscriptionService = {
     data: CreateSubscriptionData
   ): Promise<ApiResponse<Subscription>> {
     try {
-      return await apiClient.post<Subscription>(
+      const response = await apiClient.post<Subscription>(
         API_ENDPOINTS.SUBSCRIPTIONS.BASE,
         data
       );
+
+      if (response.success) {
+        // Success notification handled in the hook layer
+        // But we can add a backup here
+        if (response.data) {
+          notifications.operationSuccess.subscriptionCreated("Langganan Baru");
+        }
+      }
+
+      return response;
     } catch (error) {
       return {
         success: false,
@@ -109,10 +120,16 @@ export const subscriptionService = {
     data: Partial<CreateSubscriptionData>
   ): Promise<ApiResponse<Subscription>> {
     try {
-      return await apiClient.put<Subscription>(
+      const response = await apiClient.put<Subscription>(
         API_ENDPOINTS.SUBSCRIPTIONS.BY_ID(id),
         data
       );
+
+      if (response.success) {
+        notifications.operationSuccess.subscriptionUpdated();
+      }
+
+      return response;
     } catch (error) {
       return {
         success: false,
@@ -129,10 +146,18 @@ export const subscriptionService = {
     data: PauseSubscriptionData
   ): Promise<ApiResponse<void>> {
     try {
-      return await apiClient.put<void>(
+      const response = await apiClient.put<void>(
         API_ENDPOINTS.SUBSCRIPTIONS.PAUSE(id),
         data
       );
+
+      if (response.success) {
+        // Format resume date for notification
+        const resumeDate = new Date(data.end_date).toLocaleDateString("id-ID");
+        notifications.operationSuccess.subscriptionPaused(resumeDate);
+      }
+
+      return response;
     } catch (error) {
       return {
         success: false,
@@ -146,7 +171,15 @@ export const subscriptionService = {
 
   async resume(id: string): Promise<ApiResponse<void>> {
     try {
-      return await apiClient.put<void>(API_ENDPOINTS.SUBSCRIPTIONS.RESUME(id));
+      const response = await apiClient.put<void>(
+        API_ENDPOINTS.SUBSCRIPTIONS.RESUME(id)
+      );
+
+      if (response.success) {
+        notifications.operationSuccess.subscriptionResumed();
+      }
+
+      return response;
     } catch (error) {
       return {
         success: false,
@@ -160,9 +193,15 @@ export const subscriptionService = {
 
   async cancel(id: string): Promise<ApiResponse<void>> {
     try {
-      return await apiClient.delete<void>(
+      const response = await apiClient.delete<void>(
         API_ENDPOINTS.SUBSCRIPTIONS.CANCEL(id)
       );
+
+      if (response.success) {
+        notifications.operationSuccess.subscriptionCancelled();
+      }
+
+      return response;
     } catch (error) {
       return {
         success: false,
@@ -177,10 +216,20 @@ export const subscriptionService = {
   // Payment webhook (for backend integration)
   async processPaymentWebhook(data: any): Promise<ApiResponse<void>> {
     try {
-      return await apiClient.post<void>(
+      const response = await apiClient.post<void>(
         API_ENDPOINTS.SUBSCRIPTIONS.WEBHOOK_PAYMENT,
         data
       );
+
+      if (response.success) {
+        notifications.success({
+          title: "Pembayaran berhasil diproses! 💳",
+          description: "Status langganan telah diperbarui",
+          duration: 5000,
+        });
+      }
+
+      return response;
     } catch (error) {
       return {
         success: false,
@@ -198,10 +247,20 @@ export const subscriptionService = {
     end_date?: string;
   }): Promise<ApiResponse<SubscriptionStats>> {
     try {
-      return await apiClient.get<SubscriptionStats>(
+      const response = await apiClient.get<SubscriptionStats>(
         API_ENDPOINTS.SUBSCRIPTIONS.ADMIN.STATS,
         params
       );
+
+      if (response.success) {
+        notifications.success({
+          title: "Statistik berhasil dimuat! 📊",
+          description: "Data terbaru telah ditampilkan",
+          duration: 3000,
+        });
+      }
+
+      return response;
     } catch (error) {
       return {
         success: false,
@@ -269,10 +328,22 @@ export const subscriptionService = {
     data: ForceCancelData
   ): Promise<ApiResponse<void>> {
     try {
-      return await apiClient.put<void>(
+      const response = await apiClient.put<void>(
         API_ENDPOINTS.SUBSCRIPTIONS.ADMIN.FORCE_CANCEL(id),
         data
       );
+
+      if (response.success) {
+        notifications.success({
+          title: "Langganan berhasil dibatalkan paksa! ⚠️",
+          description: data.notify_user
+            ? "Notifikasi telah dikirim ke user"
+            : "Langganan dibatalkan tanpa notifikasi",
+          duration: 5000,
+        });
+      }
+
+      return response;
     } catch (error) {
       return {
         success: false,
@@ -286,9 +357,20 @@ export const subscriptionService = {
 
   async processExpiredPauses(): Promise<ApiResponse<void>> {
     try {
-      return await apiClient.post<void>(
+      const response = await apiClient.post<void>(
         API_ENDPOINTS.SUBSCRIPTIONS.ADMIN.PROCESS_EXPIRED
       );
+
+      if (response.success) {
+        notifications.success({
+          title: "Langganan expired berhasil diproses! 🔄",
+          description:
+            "Semua langganan yang sudah jatuh tempo telah diaktifkan",
+          duration: 4000,
+        });
+      }
+
+      return response;
     } catch (error) {
       return {
         success: false,

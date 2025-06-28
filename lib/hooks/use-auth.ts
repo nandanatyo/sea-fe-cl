@@ -1,4 +1,4 @@
-// lib/hooks/use-auth.ts (Updated with enhanced notifications)
+// lib/hooks/use-auth.ts - Updated with access token only + enhanced notifications
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { authService, type LoginData, type RegisterData } from "@/lib/api/auth";
@@ -13,40 +13,50 @@ export function useAuth() {
   const router = useRouter();
 
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    if (currentUser) {
-      setUser(convertUserFromBackend(currentUser));
-    }
-    setLoading(false);
+    const initAuth = () => {
+      if (authService.validateToken()) {
+        const currentUser = authService.getCurrentUser();
+        if (currentUser) {
+          setUser(convertUserFromBackend(currentUser));
+        }
+      } else {
+        // Clear invalid data
+        authService.removeAuthToken();
+      }
+      setLoading(false);
+    };
+
+    initAuth();
   }, []);
 
   const login = async (data: LoginData) => {
-    const loadingToast = notifications.loading(
-      "Sedang masuk...",
-      "Memverifikasi kredensial kamu"
-    );
-
     try {
       setLoading(true);
+
       const response = await authService.login(data);
 
       if (response.success && response.data) {
         const convertedUser = convertUserFromBackend(response.data.user);
         setUser(convertedUser);
 
-        // Dismiss loading toast and show success
+        // Success notification
         notifications.success({
           title: `Selamat datang kembali, ${
             convertedUser.fullName || convertedUser.name
           }! 🎉`,
-          description: "Siap melanjutkan perjalanan hidup sehat?",
+          description:
+            "Login berhasil! Siap melanjutkan perjalanan hidup sehat?",
+          duration: 5000,
         });
 
+        // Navigate based on role
         if (convertedUser.role === "admin") {
           router.push(ROUTES.DASHBOARD.ADMIN);
         } else {
           router.push(ROUTES.DASHBOARD.USER);
         }
+
+        return true;
       } else {
         notifications.error({
           title: "Login gagal 😔",
@@ -54,7 +64,6 @@ export function useAuth() {
           action: {
             label: "Coba Lagi",
             onClick: () => {
-              // Focus on email input if available
               const emailInput = document.querySelector(
                 'input[type="email"]'
               ) as HTMLInputElement;
@@ -62,6 +71,7 @@ export function useAuth() {
             },
           },
         });
+        return false;
       }
     } catch (error) {
       notifications.error({
@@ -73,19 +83,16 @@ export function useAuth() {
           onClick: () => window.location.reload(),
         },
       });
+      return false;
     } finally {
       setLoading(false);
     }
   };
 
   const adminLogin = async (data: { email: string; password: string }) => {
-    const loadingToast = notifications.loading(
-      "Memverifikasi admin...",
-      "Memeriksa kredensial admin"
-    );
-
     try {
       setLoading(true);
+
       const response = await adminService.login(data);
 
       if (response.success && response.data) {
@@ -96,10 +103,12 @@ export function useAuth() {
           title: `Selamat datang, Admin ${
             convertedUser.fullName || convertedUser.name
           }! 👑`,
-          description: "Dashboard admin siap digunakan",
+          description: "Login admin berhasil! Dashboard siap digunakan",
+          duration: 5000,
         });
 
         router.push(ROUTES.DASHBOARD.ADMIN);
+        return true;
       } else {
         notifications.error({
           title: "Login admin gagal 🚫",
@@ -114,20 +123,17 @@ export function useAuth() {
             },
           },
         });
+        return false;
       }
     } catch (error) {
       notifications.serverError();
+      return false;
     } finally {
       setLoading(false);
     }
   };
 
   const register = async (data: RegisterFormData) => {
-    const loadingToast = notifications.loading(
-      "Membuat akun...",
-      "Menyiapkan akun baru untuk kamu"
-    );
-
     try {
       setLoading(true);
 
@@ -148,8 +154,10 @@ export function useAuth() {
           setUser(convertedUser);
 
           notifications.success({
-            title: "Selamat datang di keluarga SEA Catering! 🎉",
-            description: "Akun berhasil dibuat. Mari mulai hidup sehat!",
+            title: "Akun berhasil dibuat! 🎉",
+            description:
+              "Selamat datang di keluarga SEA Catering! Mari mulai hidup sehat!",
+            duration: 6000,
             action: {
               label: "Mulai Tour",
               onClick: () => {
@@ -163,11 +171,13 @@ export function useAuth() {
         } else {
           notifications.success({
             title: "Registrasi berhasil! 🎉",
-            description: "Silakan login untuk melanjutkan",
+            description: "Akun telah dibuat. Silakan login untuk melanjutkan",
+            duration: 5000,
           });
 
           router.push(ROUTES.AUTH.LOGIN);
         }
+        return true;
       } else {
         // Handle specific registration errors
         if (
@@ -203,6 +213,7 @@ export function useAuth() {
               response.error || "Terjadi kesalahan saat membuat akun",
           });
         }
+        return false;
       }
     } catch (error) {
       notifications.error({
@@ -213,6 +224,7 @@ export function useAuth() {
           onClick: () => window.location.reload(),
         },
       });
+      return false;
     } finally {
       setLoading(false);
     }
@@ -224,9 +236,9 @@ export function useAuth() {
     router.push(ROUTES.HOME);
 
     notifications.success({
-      title: "Sampai jumpa! 👋",
-      description:
-        "Kamu berhasil logout. Terima kasih sudah menggunakan SEA Catering!",
+      title: "Berhasil logout! 👋",
+      description: "Sampai jumpa! Terima kasih sudah menggunakan SEA Catering",
+      duration: 4000,
       action: {
         label: "Login Lagi",
         onClick: () => router.push(ROUTES.AUTH.LOGIN),
@@ -235,7 +247,7 @@ export function useAuth() {
   };
 
   const requireAuth = (redirectTo: string = ROUTES.AUTH.LOGIN) => {
-    if (!user) {
+    if (!user || !authService.validateToken()) {
       notifications.warning({
         title: "Login diperlukan 🔐",
         description:
@@ -252,46 +264,134 @@ export function useAuth() {
   };
 
   const requireAdmin = () => {
-    if (!user || user.role !== "admin") {
+    if (!user || user.role !== "admin" || !authService.validateToken()) {
       notifications.error({
         title: "Akses Ditolak 🚫",
         description: "Kamu tidak memiliki akses ke halaman admin.",
         action: {
           label: "Kembali",
-          onClick: () => router.push(ROUTES.DASHBOARD.USER),
+          onClick: () =>
+            router.push(user ? ROUTES.DASHBOARD.USER : ROUTES.HOME),
         },
       });
-      router.push(ROUTES.DASHBOARD.USER);
+      router.push(user ? ROUTES.DASHBOARD.USER : ROUTES.HOME);
       return false;
     }
     return true;
   };
 
-  const refreshToken = async () => {
+  // OTP operations with success notifications
+  const sendOTP = async (
+    email: string,
+    type: "email_verification" | "password_reset"
+  ) => {
     try {
-      const refreshToken = authService.getRefreshToken();
-      if (!refreshToken) {
-        throw new Error("No refresh token available");
-      }
+      const response = await authService.sendOTP({ email, type });
 
-      const response = await authService.refreshToken(refreshToken);
-      if (response.success && response.data) {
-        const convertedUser = convertUserFromBackend(response.data.user);
-        setUser(convertedUser);
+      if (response.success) {
+        notifications.success({
+          title: "OTP berhasil dikirim! 📧",
+          description: `Kode verifikasi telah dikirim ke ${email}`,
+          duration: 5000,
+        });
         return true;
+      } else {
+        notifications.error({
+          title: "Gagal mengirim OTP",
+          description: response.error || "Coba lagi dalam beberapa saat",
+        });
+        return false;
       }
-      return false;
     } catch (error) {
-      console.error("Token refresh failed:", error);
-      notifications.warning({
-        title: "Sesi berakhir ⏰",
-        description: "Silakan login kembali untuk melanjutkan",
-        action: {
-          label: "Login",
-          onClick: () => router.push(ROUTES.AUTH.LOGIN),
-        },
+      notifications.networkError();
+      return false;
+    }
+  };
+
+  const verifyOTP = async (
+    email: string,
+    otp: string,
+    type: "email_verification" | "password_reset"
+  ) => {
+    try {
+      const response = await authService.verifyOTP({ email, otp, type });
+
+      if (response.success) {
+        notifications.success({
+          title: "OTP berhasil diverifikasi! ✅",
+          description:
+            type === "email_verification"
+              ? "Email kamu sudah terverifikasi"
+              : "OTP valid, silakan reset password",
+          duration: 4000,
+        });
+        return true;
+      } else {
+        notifications.error({
+          title: "OTP tidak valid",
+          description: response.error || "Pastikan kode yang dimasukkan benar",
+        });
+        return false;
+      }
+    } catch (error) {
+      notifications.networkError();
+      return false;
+    }
+  };
+
+  const forgotPassword = async (phone: string) => {
+    try {
+      const response = await authService.forgotPassword({ phone });
+
+      if (response.success) {
+        notifications.success({
+          title: "Link reset password dikirim! 📱",
+          description: `Instruksi reset password telah dikirim ke ${phone}`,
+          duration: 5000,
+        });
+        return true;
+      } else {
+        notifications.error({
+          title: "Gagal mengirim link reset",
+          description: response.error || "Pastikan nomor HP terdaftar",
+        });
+        return false;
+      }
+    } catch (error) {
+      notifications.networkError();
+      return false;
+    }
+  };
+
+  const resetPassword = async (
+    phone: string,
+    otp: string,
+    newPassword: string
+  ) => {
+    try {
+      const response = await authService.resetPassword({
+        phone,
+        otp,
+        new_password: newPassword,
       });
-      logout();
+
+      if (response.success) {
+        notifications.success({
+          title: "Password berhasil direset! 🔐",
+          description: "Silakan login dengan password baru kamu",
+          duration: 5000,
+        });
+        router.push(ROUTES.AUTH.LOGIN);
+        return true;
+      } else {
+        notifications.error({
+          title: "Gagal reset password",
+          description: response.error || "OTP mungkin sudah expired",
+        });
+        return false;
+      }
+    } catch (error) {
+      notifications.networkError();
       return false;
     }
   };
@@ -305,8 +405,11 @@ export function useAuth() {
     logout,
     requireAuth,
     requireAdmin,
-    refreshToken,
-    isAuthenticated: !!user,
+    sendOTP,
+    verifyOTP,
+    forgotPassword,
+    resetPassword,
+    isAuthenticated: !!user && authService.validateToken(),
     isAdmin: user?.role === "admin",
   };
 }

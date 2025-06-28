@@ -1,4 +1,4 @@
-// lib/api/auth.ts
+// lib/api/auth.ts - Updated to use access token only
 import { apiClient } from "./client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { User, ApiResponse } from "@/lib/types";
@@ -59,7 +59,7 @@ export const authService = {
       );
 
       if (response.success && response.data) {
-        // Store access token and user data
+        // Store only access token and user data
         localStorage.setItem("access_token", response.data.access_token);
         localStorage.setItem("user", JSON.stringify(response.data.user));
       }
@@ -81,7 +81,7 @@ export const authService = {
       );
 
       if (response.success && response.data) {
-        // Auto login after registration
+        // Auto login after registration - store access token only
         localStorage.setItem("access_token", response.data.access_token);
         localStorage.setItem("user", JSON.stringify(response.data.user));
       }
@@ -91,29 +91,6 @@ export const authService = {
       return {
         success: false,
         error: error instanceof Error ? error.message : "Registration failed",
-      };
-    }
-  },
-
-  async refreshToken(refreshToken: string): Promise<ApiResponse<AuthResponse>> {
-    try {
-      const response = await apiClient.post<AuthResponse>(
-        API_ENDPOINTS.AUTH.REFRESH,
-        {
-          refresh_token: refreshToken,
-        }
-      );
-
-      if (response.success && response.data) {
-        localStorage.setItem("access_token", response.data.access_token);
-        localStorage.setItem("user", JSON.stringify(response.data.user));
-      }
-
-      return response;
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Token refresh failed",
       };
     }
   },
@@ -197,6 +174,7 @@ export const authService = {
     if (typeof window !== "undefined") {
       localStorage.removeItem("access_token");
       localStorage.removeItem("user");
+      // Remove refresh token storage since we're not using it anymore
       localStorage.removeItem("refresh_token");
     }
   },
@@ -217,8 +195,33 @@ export const authService = {
     return localStorage.getItem("access_token");
   },
 
-  getRefreshToken(): string | null {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("refresh_token");
+  // Check if user is authenticated
+  isAuthenticated(): boolean {
+    return !!this.getAccessToken() && !!this.getCurrentUser();
+  },
+
+  // Validate token (you can extend this to check expiration)
+  validateToken(): boolean {
+    const token = this.getAccessToken();
+    const user = this.getCurrentUser();
+
+    if (!token || !user) {
+      this.removeAuthToken();
+      return false;
+    }
+
+    // Add token expiration check here if backend provides exp claim
+    try {
+      // Basic validation - you can enhance this
+      const tokenParts = token.split(".");
+      if (tokenParts.length !== 3) {
+        this.removeAuthToken();
+        return false;
+      }
+      return true;
+    } catch {
+      this.removeAuthToken();
+      return false;
+    }
   },
 };

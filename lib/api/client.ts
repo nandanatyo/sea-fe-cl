@@ -1,3 +1,4 @@
+// lib/api/client.ts - Updated to use access token only
 import { ApiResponse } from "@/lib/types";
 import { notifications } from "@/lib/utils/notifications";
 
@@ -24,8 +25,8 @@ class ApiClient {
       ...options,
     };
 
-    // Add auth token if available
-    const token = this.getAuthToken();
+    // Add auth token if available - using only access token
+    const token = this.getAccessToken();
     if (token) {
       config.headers = {
         ...config.headers,
@@ -96,6 +97,8 @@ class ApiClient {
         notifications.validationError(errorMessage);
         break;
       case 401:
+        // Clear invalid token and redirect to login
+        this.clearAuthToken();
         notifications.unauthorized();
         break;
       case 403:
@@ -133,19 +136,16 @@ class ApiClient {
     }
   }
 
-  private getAuthToken(): string | null {
+  private getAccessToken(): string | null {
     if (typeof window === "undefined") return null;
+    return localStorage.getItem("access_token");
+  }
 
-    try {
-      const user = localStorage.getItem("user");
-      if (user) {
-        const userData = JSON.parse(user);
-        return userData.access_token || null;
-      }
-      return localStorage.getItem("access_token");
-    } catch {
-      return null;
-    }
+  private clearAuthToken(): void {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("refresh_token"); // Clean up old refresh token if exists
   }
 
   // Public methods with optional error notification control
@@ -231,7 +231,7 @@ class ApiClient {
     };
 
     // Add auth token if available
-    const token = this.getAuthToken();
+    const token = this.getAccessToken();
     if (token) {
       config.headers = {
         ...config.headers,

@@ -1,5 +1,5 @@
-// lib/api/client.ts
 import { ApiResponse } from "@/lib/types";
+import { notifications } from "@/lib/utils/notifications";
 
 class ApiClient {
   private baseURL: string;
@@ -11,7 +11,8 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    showErrorNotification = true
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
 
@@ -47,10 +48,17 @@ class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
-        return {
+        const errorResponse = {
           success: false,
           error: data.error || data.message || `HTTP ${response.status}`,
         };
+
+        // Show appropriate error notification based on status code
+        if (showErrorNotification) {
+          this.handleErrorNotification(response.status, errorResponse.error);
+        }
+
+        return errorResponse;
       }
 
       return {
@@ -60,11 +68,68 @@ class ApiClient {
       };
     } catch (error) {
       console.error("API Request failed:", error);
-      return {
+
+      const errorResponse = {
         success: false,
         error:
           error instanceof Error ? error.message : "Network error occurred",
       };
+
+      if (showErrorNotification) {
+        if (error instanceof TypeError && error.message.includes("fetch")) {
+          notifications.networkError();
+        } else {
+          notifications.error({
+            title: "Terjadi kesalahan",
+            description: errorResponse.error,
+          });
+        }
+      }
+
+      return errorResponse;
+    }
+  }
+
+  private handleErrorNotification(statusCode: number, errorMessage: string) {
+    switch (statusCode) {
+      case 400:
+        notifications.validationError(errorMessage);
+        break;
+      case 401:
+        notifications.unauthorized();
+        break;
+      case 403:
+        notifications.permissionDenied();
+        break;
+      case 404:
+        notifications.error({
+          title: "Data tidak ditemukan 🔍",
+          description: "Data yang kamu cari tidak tersedia",
+        });
+        break;
+      case 409:
+        notifications.error({
+          title: "Konflik data ⚠️",
+          description: errorMessage || "Data sudah ada atau sedang digunakan",
+        });
+        break;
+      case 422:
+        notifications.validationError(errorMessage);
+        break;
+      case 429:
+        notifications.quotaExceeded();
+        break;
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        notifications.serverError();
+        break;
+      default:
+        notifications.error({
+          title: "Terjadi kesalahan",
+          description: errorMessage,
+        });
     }
   }
 
@@ -83,45 +148,79 @@ class ApiClient {
     }
   }
 
+  // Public methods with optional error notification control
   async get<T>(
     endpoint: string,
-    params?: Record<string, string>
+    params?: Record<string, string>,
+    showErrorNotification = true
   ): Promise<ApiResponse<T>> {
     const url = params
       ? `${endpoint}?${new URLSearchParams(params).toString()}`
       : endpoint;
-    return this.request<T>(url, { method: "GET" });
+    return this.request<T>(url, { method: "GET" }, showErrorNotification);
   }
 
-  async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, {
-      method: "POST",
-      body: data ? JSON.stringify(data) : undefined,
-    });
+  async post<T>(
+    endpoint: string,
+    data?: any,
+    showErrorNotification = true
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(
+      endpoint,
+      {
+        method: "POST",
+        body: data ? JSON.stringify(data) : undefined,
+      },
+      showErrorNotification
+    );
   }
 
-  async put<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, {
-      method: "PUT",
-      body: data ? JSON.stringify(data) : undefined,
-    });
+  async put<T>(
+    endpoint: string,
+    data?: any,
+    showErrorNotification = true
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(
+      endpoint,
+      {
+        method: "PUT",
+        body: data ? JSON.stringify(data) : undefined,
+      },
+      showErrorNotification
+    );
   }
 
-  async patch<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, {
-      method: "PATCH",
-      body: data ? JSON.stringify(data) : undefined,
-    });
+  async patch<T>(
+    endpoint: string,
+    data?: any,
+    showErrorNotification = true
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(
+      endpoint,
+      {
+        method: "PATCH",
+        body: data ? JSON.stringify(data) : undefined,
+      },
+      showErrorNotification
+    );
   }
 
-  async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: "DELETE" });
+  async delete<T>(
+    endpoint: string,
+    showErrorNotification = true
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(
+      endpoint,
+      { method: "DELETE" },
+      showErrorNotification
+    );
   }
 
   // For file uploads
   async uploadFile<T>(
     endpoint: string,
-    formData: FormData
+    formData: FormData,
+    showErrorNotification = true
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
 
@@ -145,10 +244,16 @@ class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
-        return {
+        const errorResponse = {
           success: false,
           error: data.error || data.message || `HTTP ${response.status}`,
         };
+
+        if (showErrorNotification) {
+          this.handleErrorNotification(response.status, errorResponse.error);
+        }
+
+        return errorResponse;
       }
 
       return {
@@ -158,10 +263,20 @@ class ApiClient {
       };
     } catch (error) {
       console.error("File upload failed:", error);
-      return {
+
+      const errorResponse = {
         success: false,
         error: error instanceof Error ? error.message : "Upload failed",
       };
+
+      if (showErrorNotification) {
+        notifications.error({
+          title: "Upload gagal",
+          description: errorResponse.error,
+        });
+      }
+
+      return errorResponse;
     }
   }
 }

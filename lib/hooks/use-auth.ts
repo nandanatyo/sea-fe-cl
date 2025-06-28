@@ -1,9 +1,9 @@
-// lib/hooks/use-auth.ts
+// lib/hooks/use-auth.ts (Updated with enhanced notifications)
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { authService, type LoginData, type RegisterData } from "@/lib/api/auth";
 import { adminService } from "@/lib/api/admin";
-import { useToast } from "@/hooks/use-toast";
+import { notifications } from "@/lib/utils/notifications";
 import { User, convertUserFromBackend } from "@/lib/types";
 import { ROUTES } from "@/lib/constants";
 
@@ -11,7 +11,6 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const { toast } = useToast();
 
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
@@ -22,6 +21,11 @@ export function useAuth() {
   }, []);
 
   const login = async (data: LoginData) => {
+    const loadingToast = notifications.loading(
+      "Sedang masuk...",
+      "Memverifikasi kredensial kamu"
+    );
+
     try {
       setLoading(true);
       const response = await authService.login(data);
@@ -30,10 +34,11 @@ export function useAuth() {
         const convertedUser = convertUserFromBackend(response.data.user);
         setUser(convertedUser);
 
-        toast({
+        // Dismiss loading toast and show success
+        notifications.success({
           title: `Selamat datang kembali, ${
             convertedUser.fullName || convertedUser.name
-          }!`,
+          }! 🎉`,
           description: "Siap melanjutkan perjalanan hidup sehat?",
         });
 
@@ -43,17 +48,30 @@ export function useAuth() {
           router.push(ROUTES.DASHBOARD.USER);
         }
       } else {
-        toast({
+        notifications.error({
           title: "Login gagal 😔",
           description: response.error || "Email/nomor HP atau password salah",
-          variant: "destructive",
+          action: {
+            label: "Coba Lagi",
+            onClick: () => {
+              // Focus on email input if available
+              const emailInput = document.querySelector(
+                'input[type="email"]'
+              ) as HTMLInputElement;
+              if (emailInput) emailInput.focus();
+            },
+          },
         });
       }
     } catch (error) {
-      toast({
+      notifications.error({
         title: "Login gagal",
-        description: "Terjadi kesalahan pada server",
-        variant: "destructive",
+        description:
+          "Terjadi kesalahan pada server. Coba lagi dalam beberapa menit.",
+        action: {
+          label: "Refresh",
+          onClick: () => window.location.reload(),
+        },
       });
     } finally {
       setLoading(false);
@@ -61,6 +79,11 @@ export function useAuth() {
   };
 
   const adminLogin = async (data: { email: string; password: string }) => {
+    const loadingToast = notifications.loading(
+      "Memverifikasi admin...",
+      "Memeriksa kredensial admin"
+    );
+
     try {
       setLoading(true);
       const response = await adminService.login(data);
@@ -69,39 +92,48 @@ export function useAuth() {
         const convertedUser = convertUserFromBackend(response.data.user);
         setUser(convertedUser);
 
-        toast({
+        notifications.success({
           title: `Selamat datang, Admin ${
             convertedUser.fullName || convertedUser.name
-          }!`,
+          }! 👑`,
           description: "Dashboard admin siap digunakan",
         });
 
         router.push(ROUTES.DASHBOARD.ADMIN);
       } else {
-        toast({
-          title: "Login admin gagal 😔",
-          description: response.error || "Email atau password salah",
-          variant: "destructive",
+        notifications.error({
+          title: "Login admin gagal 🚫",
+          description: response.error || "Email atau password admin salah",
+          action: {
+            label: "Hubungi IT",
+            onClick: () => {
+              window.open(
+                "mailto:it@seacatering.id?subject=Admin Login Issue",
+                "_blank"
+              );
+            },
+          },
         });
       }
     } catch (error) {
-      toast({
-        title: "Login admin gagal",
-        description: "Terjadi kesalahan pada server",
-        variant: "destructive",
-      });
+      notifications.serverError();
     } finally {
       setLoading(false);
     }
   };
 
   const register = async (data: RegisterFormData) => {
+    const loadingToast = notifications.loading(
+      "Membuat akun...",
+      "Menyiapkan akun baru untuk kamu"
+    );
+
     try {
       setLoading(true);
 
       // Convert frontend data to backend format
       const backendData: RegisterData = {
-        name: data.fullName, // Convert fullName to name
+        name: data.fullName,
         phone: data.phone,
         password: data.password,
         email: data.email,
@@ -115,14 +147,21 @@ export function useAuth() {
           const convertedUser = convertUserFromBackend(response.data.user);
           setUser(convertedUser);
 
-          toast({
+          notifications.success({
             title: "Selamat datang di keluarga SEA Catering! 🎉",
-            description: "Akun berhasil dibuat. Selamat datang!",
+            description: "Akun berhasil dibuat. Mari mulai hidup sehat!",
+            action: {
+              label: "Mulai Tour",
+              onClick: () => {
+                // Could trigger an onboarding tour
+                console.log("Start onboarding tour");
+              },
+            },
           });
 
           router.push(ROUTES.DASHBOARD.USER);
         } else {
-          toast({
+          notifications.success({
             title: "Registrasi berhasil! 🎉",
             description: "Silakan login untuk melanjutkan",
           });
@@ -130,17 +169,49 @@ export function useAuth() {
           router.push(ROUTES.AUTH.LOGIN);
         }
       } else {
-        toast({
-          title: "Registrasi gagal 😔",
-          description: response.error || "Terjadi kesalahan saat membuat akun",
-          variant: "destructive",
-        });
+        // Handle specific registration errors
+        if (
+          response.error?.includes("email") &&
+          response.error?.includes("sudah")
+        ) {
+          notifications.error({
+            title: "Email sudah terdaftar 📧",
+            description:
+              "Email ini sudah digunakan. Coba login atau gunakan email lain.",
+            action: {
+              label: "Login",
+              onClick: () => router.push(ROUTES.AUTH.LOGIN),
+            },
+          });
+        } else if (
+          response.error?.includes("phone") &&
+          response.error?.includes("sudah")
+        ) {
+          notifications.error({
+            title: "Nomor HP sudah terdaftar 📱",
+            description:
+              "Nomor ini sudah digunakan. Coba login atau gunakan nomor lain.",
+            action: {
+              label: "Login",
+              onClick: () => router.push(ROUTES.AUTH.LOGIN),
+            },
+          });
+        } else {
+          notifications.error({
+            title: "Registrasi gagal 😔",
+            description:
+              response.error || "Terjadi kesalahan saat membuat akun",
+          });
+        }
       }
     } catch (error) {
-      toast({
+      notifications.error({
         title: "Registrasi gagal",
         description: "Terjadi kesalahan pada server",
-        variant: "destructive",
+        action: {
+          label: "Coba Lagi",
+          onClick: () => window.location.reload(),
+        },
       });
     } finally {
       setLoading(false);
@@ -152,20 +223,27 @@ export function useAuth() {
     setUser(null);
     router.push(ROUTES.HOME);
 
-    toast({
+    notifications.success({
       title: "Sampai jumpa! 👋",
       description:
         "Kamu berhasil logout. Terima kasih sudah menggunakan SEA Catering!",
+      action: {
+        label: "Login Lagi",
+        onClick: () => router.push(ROUTES.AUTH.LOGIN),
+      },
     });
   };
 
   const requireAuth = (redirectTo: string = ROUTES.AUTH.LOGIN) => {
     if (!user) {
-      toast({
+      notifications.warning({
         title: "Login diperlukan 🔐",
         description:
           "Silakan login terlebih dahulu untuk mengakses halaman ini",
-        variant: "destructive",
+        action: {
+          label: "Login Sekarang",
+          onClick: () => router.push(redirectTo),
+        },
       });
       router.push(redirectTo);
       return false;
@@ -175,10 +253,13 @@ export function useAuth() {
 
   const requireAdmin = () => {
     if (!user || user.role !== "admin") {
-      toast({
+      notifications.error({
         title: "Akses Ditolak 🚫",
         description: "Kamu tidak memiliki akses ke halaman admin.",
-        variant: "destructive",
+        action: {
+          label: "Kembali",
+          onClick: () => router.push(ROUTES.DASHBOARD.USER),
+        },
       });
       router.push(ROUTES.DASHBOARD.USER);
       return false;
@@ -202,6 +283,14 @@ export function useAuth() {
       return false;
     } catch (error) {
       console.error("Token refresh failed:", error);
+      notifications.warning({
+        title: "Sesi berakhir ⏰",
+        description: "Silakan login kembali untuk melanjutkan",
+        action: {
+          label: "Login",
+          onClick: () => router.push(ROUTES.AUTH.LOGIN),
+        },
+      });
       logout();
       return false;
     }

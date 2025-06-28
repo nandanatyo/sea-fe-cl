@@ -1,4 +1,3 @@
-// components/forms/subscription/subscription-form.tsx
 "use client";
 
 import { useMemo, useEffect, useState } from "react";
@@ -16,11 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Heart } from "lucide-react";
+import { Heart, AlertTriangle } from "lucide-react";
 import { useSubscription } from "@/lib/hooks/use-subscription";
 import { useAuth } from "@/lib/hooks/use-auth";
+import { useApiError } from "@/hooks/use-api-error";
 import { mealPlansService, type MealPlan } from "@/lib/api/meal-plans";
-import { useToast } from "@/hooks/use-toast";
+import { notifications } from "@/lib/utils/notifications";
 import {
   subscriptionSchema,
   type SubscriptionFormData,
@@ -31,13 +31,16 @@ import { PlanSelector } from "./plan-selector";
 import { MealTypeSelector } from "./meal-type-selector";
 import { DeliveryDaySelector } from "./delivery-day-selector";
 import { PriceSummary } from "./price-summary";
+import { ErrorFallback } from "@/components/common/error-fallback";
+import { RetryButton } from "@/components/common/retry-button";
 
 export function SubscriptionForm() {
   const { user } = useAuth();
   const { createSubscription, loading } = useSubscription(user?.id);
-  const { toast } = useToast();
+  const { handleError, handleSuccess } = useApiError();
   const [availablePlans, setAvailablePlans] = useState(MEAL_PLANS);
   const [loadingPlans, setLoadingPlans] = useState(true);
+  const [planError, setPlanError] = useState<Error | null>(null);
 
   const {
     register,
@@ -62,11 +65,13 @@ export function SubscriptionForm() {
 
   const watchedFields = watch();
 
-  // Fetch available meal plans from backend
+  // Fetch available meal plans from backend with error handling
   useEffect(() => {
     const fetchMealPlans = async () => {
       try {
         setLoadingPlans(true);
+        setPlanError(null);
+
         const response = await mealPlansService.getActive();
 
         if (response.success && response.data && response.data.length > 0) {
@@ -90,18 +95,31 @@ export function SubscriptionForm() {
           }));
 
           setAvailablePlans(convertedPlans);
+          notifications.success({
+            title: "Menu berhasil dimuat",
+            description: `${convertedPlans.length} paket tersedia untuk kamu`,
+            duration: 3000,
+          });
+        } else {
+          // Use fallback static data
+          setAvailablePlans(MEAL_PLANS);
+          notifications.warning({
+            title: "Menggunakan menu default",
+            description: "Koneksi ke server terbatas, menampilkan menu standar",
+          });
         }
       } catch (error) {
         console.error("Failed to fetch meal plans:", error);
-        // Use fallback static data
+        setPlanError(error as Error);
         setAvailablePlans(MEAL_PLANS);
+        handleError(error, "memuat paket makanan");
       } finally {
         setLoadingPlans(false);
       }
     };
 
     fetchMealPlans();
-  }, []);
+  }, [handleError]);
 
   // Auto-fill user data if logged in
   useEffect(() => {
@@ -144,22 +162,38 @@ export function SubscriptionForm() {
 
   const onSubmit = async (data: SubscriptionFormData) => {
     if (!user) {
-      toast({
+      notifications.warning({
         title: "Login diperlukan 🔐",
         description: "Silakan login terlebih dahulu untuk membuat langganan",
-        variant: "destructive",
+        action: {
+          label: "Login Sekarang",
+          onClick: () => (window.location.href = "/login"),
+        },
       });
       return;
     }
 
-    const success = await createSubscription({
-      ...data,
-      totalPrice: Math.round(totalPrice),
-    });
+    try {
+      const success = await createSubscription({
+        ...data,
+        totalPrice: Math.round(totalPrice),
+      });
 
-    if (success) {
-      reset();
+      if (success) {
+        reset();
+        handleSuccess(
+          "Langganan berhasil dibuat! 🎉",
+          "Tim kami akan segera menghubungi kamu"
+        );
+      }
+    } catch (error) {
+      handleError(error, "membuat langganan");
     }
+  };
+
+  const handleRetryPlans = async () => {
+    // Force refetch meal plans
+    window.location.reload();
   };
 
   // Helper functions for plan conversion
@@ -217,6 +251,19 @@ export function SubscriptionForm() {
     return "✨ Recommended";
   };
 
+  // Show error fallback if plan loading failed
+  if (planError) {
+    return (
+      <ErrorFallback
+        error={planError}
+        title="Gagal memuat paket makanan"
+        description="Terjadi kesalahan saat memuat daftar paket makanan"
+        resetError={handleRetryPlans}
+        showDetails={process.env.NODE_ENV === "development"}
+      />
+    );
+  }
+
   return (
     <div className="grid lg:grid-cols-3 gap-10">
       <div className="lg:col-span-2">
@@ -250,6 +297,7 @@ export function SubscriptionForm() {
                       {...register("name")}
                       placeholder="Masukkan nama lengkap kamu"
                       className="mt-2 h-12"
+                      disabled={loading}
                     />
                     {errors.name && (
                       <p className="text-red-500 text-sm mt-1">
@@ -267,6 +315,7 @@ export function SubscriptionForm() {
                       {...register("phone")}
                       placeholder="08123456789"
                       className="mt-2 h-12"
+                      disabled={loading}
                     />
                     {errors.phone && (
                       <p className="text-red-500 text-sm mt-1">
@@ -285,7 +334,8 @@ export function SubscriptionForm() {
                       onValueChange={(value) =>
                         setValue("city", value, { shouldValidate: true })
                       }
-                      value={watchedFields.city}>
+                      value={watchedFields.city}
+                      disabled={loading}>
                       <SelectTrigger className="mt-2 h-12">
                         <SelectValue placeholder="Pilih kota kamu" />
                       </SelectTrigger>
@@ -315,6 +365,7 @@ export function SubscriptionForm() {
                       {...register("address")}
                       placeholder="Jl. Contoh No. 123, RT/RW"
                       className="mt-2 h-12"
+                      disabled={loading}
                     />
                     {errors.address && (
                       <p className="text-red-500 text-sm mt-1">
@@ -338,16 +389,18 @@ export function SubscriptionForm() {
                   </div>
                 </div>
               ) : (
-                <PlanSelector
-                  selectedPlan={watchedFields.plan}
-                  onPlanChange={handlePlanChange}
-                  availablePlans={availablePlans}
-                />
-              )}
-              {errors.plan && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.plan.message}
-                </p>
+                <>
+                  <PlanSelector
+                    selectedPlan={watchedFields.plan}
+                    onPlanChange={handlePlanChange}
+                    availablePlans={availablePlans}
+                  />
+                  {errors.plan && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.plan.message}
+                    </p>
+                  )}
+                </>
               )}
 
               <MealTypeSelector
@@ -386,14 +439,36 @@ export function SubscriptionForm() {
                   placeholder="Contoh: Alergi seafood, tidak suka pedas, vegetarian, dll. Kosongkan jika tidak ada."
                   rows={4}
                   className="resize-none"
+                  disabled={loading}
                 />
               </div>
 
+              {/* Warning for offline users */}
+              {!navigator.onLine && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                    <div>
+                      <h4 className="font-semibold text-yellow-800">
+                        Tidak ada koneksi internet
+                      </h4>
+                      <p className="text-yellow-700 text-sm">
+                        Data akan disimpan ketika koneksi kembali normal
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <Button
                 type="submit"
-                disabled={loading || totalPrice === 0}
+                disabled={loading || totalPrice === 0 || !navigator.onLine}
                 className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 h-14 text-lg font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed">
-                {loading ? "Memproses..." : "🎉 Buat Langganan Sekarang"}
+                {loading
+                  ? "Memproses..."
+                  : !navigator.onLine
+                  ? "Menunggu Koneksi..."
+                  : "🎉 Buat Langganan Sekarang"}
               </Button>
             </form>
           </CardContent>

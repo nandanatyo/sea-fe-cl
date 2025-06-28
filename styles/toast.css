@@ -1,0 +1,33 @@
+.custom-toast {
+  font-family: "Inter", sans-serif;
+}
+
+.custom-toast[data-type="error"] {
+  border-left: 4px solid #ef4444;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.custom-toast[data-type="success"] {
+  border-left: 4px solid #10b981;
+  background: #f0fdf4;
+  color: #065f46;
+}
+
+.custom-toast[data-type="warning"] {
+  border-left: 4px solid #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.custom-toast[data-type="info"] {
+  border-left: 4px solid #3b82f6;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.custom-toast[data-type="loading"] {
+  border-left: 4px solid #6b7280;
+  background: #f9fafb;
+  color: #374151;
+}

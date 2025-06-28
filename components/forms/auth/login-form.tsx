@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Mail, Lock } from "lucide-react";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useFormValidation } from "@/lib/hooks/use-form-validation";
+import { useApiError } from "@/hooks/use-api-error";
 import { loginSchema, type LoginFormData } from "@/lib/validations/auth";
 import { PasswordInput } from "./password-input";
+import { RetryButton } from "@/components/common/retry-button";
 
 const initialValues: LoginFormData = {
   email: "",
@@ -17,6 +19,9 @@ const initialValues: LoginFormData = {
 
 export function LoginForm() {
   const { login, loading } = useAuth();
+  const { handleError } = useApiError();
+  const [hasError, setHasError] = useState(false);
+
   const { values, errors, setValue, validate, reset } = useFormValidation(
     initialValues,
     loginSchema
@@ -24,11 +29,26 @@ export function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setHasError(false);
 
     const isValid = await validate();
     if (!isValid) return;
 
-    await login(values);
+    try {
+      await login(values);
+    } catch (error) {
+      setHasError(true);
+      handleError(error, "login");
+    }
+  };
+
+  const handleRetry = () => {
+    setHasError(false);
+    // Focus on first input
+    const firstInput = document.querySelector(
+      'input[type="email"]'
+    ) as HTMLInputElement;
+    if (firstInput) firstInput.focus();
   };
 
   return (
@@ -47,7 +67,7 @@ export function LoginForm() {
           onChange={(e) => setValue("email", e.target.value)}
           placeholder="nama@email.com"
           className="mt-2 h-12"
-          error={errors.email}
+          disabled={loading}
         />
         {errors.email && (
           <p className="text-red-500 text-sm mt-1">{errors.email}</p>
@@ -66,9 +86,23 @@ export function LoginForm() {
           onChange={(value) => setValue("password", value)}
           placeholder="Masukkan password kamu"
           className="mt-2 h-12"
+          disabled={loading}
           error={errors.password}
         />
       </div>
+
+      {hasError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-red-800 text-sm">
+              Gagal login. Periksa kembali email dan password kamu.
+            </p>
+            <RetryButton onRetry={handleRetry} size="sm">
+              Coba Lagi
+            </RetryButton>
+          </div>
+        </div>
+      )}
 
       <Button
         type="submit"

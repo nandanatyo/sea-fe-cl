@@ -5,6 +5,10 @@ import "./globals.css";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Toaster } from "sonner";
+import { ErrorBoundary } from "@/components/common/error-boundary";
+import { ClientErrorHandler } from "@/components/common/client-error-handler";
+import { ConnectionStatus } from "@/components/common/connection-status";
+import { NetworkStatusIndicator } from "@/components/common/network-status-indicator";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,10 +26,34 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Navigation />
-        <main>{children}</main>
-        <Footer />
-        <Toaster position="top-right" richColors expand={true} closeButton />
+        <ErrorBoundary>
+          <ClientErrorHandler />
+          <ConnectionStatus />
+          <Navigation />
+          <main>{children}</main>
+          <Footer />
+          <NetworkStatusIndicator />
+
+          {/* Enhanced Toaster with custom styling */}
+          <Toaster
+            position="top-right"
+            richColors
+            expand={true}
+            closeButton
+            toastOptions={{
+              style: {
+                background: "white",
+                color: "black",
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                boxShadow:
+                  "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+              },
+              className: "custom-toast",
+              duration: 4000,
+            }}
+          />
+        </ErrorBoundary>
       </body>
     </html>
   );

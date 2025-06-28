@@ -1,4 +1,4 @@
-// components/forms/auth/login-form.tsx - Updated with TanStack Query
+// components/forms/auth/login-form.tsx - Clean version without debug UI
 "use client";
 
 import { useState } from "react";
@@ -35,12 +35,6 @@ export function LoginForm() {
 
     const isValid = await validate();
     if (!isValid) return;
-
-    // Debug the login attempt
-    console.log("🔐 Login attempt with:", {
-      email: values.email,
-      hasPassword: !!values.password,
-    });
 
     try {
       // Call the login mutation from useAuth hook
@@ -112,18 +106,6 @@ export function LoginForm() {
               Coba Lagi
             </RetryButton>
           </div>
-        </div>
-      )}
-
-      {/* Debug info in development */}
-      {process.env.NODE_ENV === "development" && (
-        <div className="bg-gray-100 p-3 rounded text-xs">
-          <p>
-            <strong>Debug Info:</strong>
-          </p>
-          <p>Loading: {isLoginLoading ? "Yes" : "No"}</p>
-          <p>Form Valid: {Object.keys(errors).length === 0 ? "Yes" : "No"}</p>
-          <p>Has Error: {hasError ? "Yes" : "No"}</p>
         </div>
       )}
 

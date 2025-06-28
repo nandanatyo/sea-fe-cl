@@ -1,10 +1,10 @@
-// app/(dashboard)/dashboard/page.tsx
+// app/(dashboard)/dashboard/page.tsx - Fixed with better error handling
 "use client";
 
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, LogOut, Plus } from "lucide-react";
+import { Settings, LogOut, Plus, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useSubscription } from "@/lib/hooks/use-subscription";
 import { PageLoading } from "@/components/common/loading/page-loading";
@@ -21,6 +21,7 @@ export default function UserDashboard() {
   const {
     subscriptions,
     loading,
+    error,
     pauseSubscription,
     cancelSubscription,
     reactivateSubscription,
@@ -31,8 +32,8 @@ export default function UserDashboard() {
   useEffect(() => {
     if (!requireAuth()) return;
 
-    // Show welcome message for new users
-    if (user && subscriptions.length === 0 && !loading) {
+    // Show welcome message for new users (only once)
+    if (user && subscriptions.length === 0 && !loading && !error) {
       const hasShownWelcome = localStorage.getItem(`welcome_shown_${user.id}`);
       if (!hasShownWelcome) {
         setTimeout(() => {
@@ -45,7 +46,7 @@ export default function UserDashboard() {
         }, 1000);
       }
     }
-  }, [requireAuth, user, subscriptions.length, loading, toast]);
+  }, [requireAuth, user, subscriptions.length, loading, error, toast]);
 
   const handlePauseSubscription = async (id: string) => {
     const success = await pauseSubscription(id);
@@ -75,10 +76,16 @@ export default function UserDashboard() {
     }
   };
 
-  if (loading) {
+  const handleRetry = async () => {
+    await refetch();
+  };
+
+  // Show loading state
+  if (loading && subscriptions.length === 0) {
     return <PageLoading message="Memuat dashboard kamu..." />;
   }
 
+  // User not authenticated
   if (!user) {
     return null;
   }
@@ -126,10 +133,48 @@ export default function UserDashboard() {
           </div>
         </div>
 
+        {/* Error State */}
+        {error && (
+          <Card className="shadow-lg border-0 mb-8 border-l-4 border-l-red-500">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {error.includes("Koneksi") ? (
+                    <WifiOff className="h-5 w-5 text-red-500" />
+                  ) : (
+                    <RefreshCw className="h-5 w-5 text-red-500" />
+                  )}
+                  <div>
+                    <h3 className="font-semibold text-red-800">
+                      {error.includes("Koneksi")
+                        ? "Koneksi Bermasalah"
+                        : "Gagal Memuat Data"}
+                    </h3>
+                    <p className="text-red-600 text-sm">{error}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRetry}
+                  disabled={loading}
+                  className="border-red-300 text-red-700 hover:bg-red-50">
+                  <RefreshCw
+                    className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+                  />
+                  Coba Lagi
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats Overview */}
-        <div className="mb-8">
-          <StatsOverview subscriptions={subscriptions} />
-        </div>
+        {!error && (
+          <div className="mb-8">
+            <StatsOverview subscriptions={subscriptions} />
+          </div>
+        )}
 
         {/* Active Subscriptions */}
         <Card className="shadow-2xl border-0 mb-8">
@@ -144,7 +189,22 @@ export default function UserDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-8">
-            {activeSubscriptions.length === 0 ? (
+            {error ? (
+              <div className="text-center py-8">
+                <div className="text-gray-500 mb-4">
+                  Tidak dapat memuat data langganan
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleRetry}
+                  disabled={loading}>
+                  <RefreshCw
+                    className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+                  />
+                  Coba Lagi
+                </Button>
+              </div>
+            ) : activeSubscriptions.length === 0 ? (
               <EmptySubscriptions />
             ) : (
               <SubscriptionList
@@ -159,7 +219,7 @@ export default function UserDashboard() {
         </Card>
 
         {/* Paused Subscriptions */}
-        {pausedSubscriptions.length > 0 && (
+        {!error && pausedSubscriptions.length > 0 && (
           <Card className="shadow-2xl border-0 mb-8">
             <CardHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-t-lg">
               <CardTitle className="text-2xl flex items-center justify-between">
@@ -188,7 +248,7 @@ export default function UserDashboard() {
         )}
 
         {/* Cancelled Subscriptions */}
-        {cancelledSubscriptions.length > 0 && (
+        {!error && cancelledSubscriptions.length > 0 && (
           <Card className="shadow-2xl border-0">
             <CardHeader className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-t-lg">
               <CardTitle className="text-2xl flex items-center justify-between">
@@ -216,7 +276,7 @@ export default function UserDashboard() {
         )}
 
         {/* Quick Actions for users with subscriptions */}
-        {subscriptions.length > 0 && (
+        {!error && subscriptions.length > 0 && (
           <Card className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 border-0">
             <CardContent className="p-6">
               <h3 className="text-lg font-bold text-gray-900 mb-4">
@@ -244,6 +304,26 @@ export default function UserDashboard() {
                   <span className="text-xl">📞</span>
                   <span className="text-sm">Hubungi Support</span>
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Network status indicator */}
+        {!navigator.onLine && (
+          <Card className="mt-8 bg-red-50 border-red-200">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <WifiOff className="h-5 w-5 text-red-600" />
+                <div>
+                  <h4 className="font-semibold text-red-800">
+                    Tidak ada koneksi internet
+                  </h4>
+                  <p className="text-red-600 text-sm">
+                    Beberapa data mungkin tidak up-to-date. Periksa koneksi
+                    internet kamu.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -1,4 +1,4 @@
-// components/navigation.tsx
+// components/navigation.tsx - Clean version without debug UI
 "use client";
 
 import { useState, useEffect } from "react";
@@ -21,14 +21,13 @@ const navigation = [
 export function Navigation() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const { user, logout, isAuthenticated, isAdmin } = useAuth();
+  const { user, logout, isAuthenticated, isAdmin, isLoading } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Don't render until mounted to avoid hydration issues
   if (!mounted) {
     return (
       <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 shadow-sm">

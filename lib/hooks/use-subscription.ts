@@ -1,4 +1,4 @@
-// lib/hooks/use-subscription.ts (Updated with enhanced notifications)
+// lib/hooks/use-subscription.ts - Fixed with proper data format handling
 import { useState, useEffect } from "react";
 import {
   subscriptionService,
@@ -15,31 +15,135 @@ import {
 export function useSubscription(userId?: string) {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchSubscriptions = async () => {
-    if (!userId) return;
+    if (!userId) {
+      console.log("📝 No userId provided, skipping subscription fetch");
+      return;
+    }
 
     try {
       setLoading(true);
+      setError(null);
+
+      console.log("📝 Fetching subscriptions for user:", userId);
+
+      // Use silent error handling to avoid showing network error notifications
       const response = await subscriptionService.getMy();
 
-      if (response.success && response.data) {
-        const convertedSubscriptions = response.data.map(
-          convertSubscriptionFromBackend
-        );
-        setSubscriptions(convertedSubscriptions);
+      console.log("📝 Raw subscription response:", response);
+
+      if (response.success) {
+        // Handle different response formats from backend
+        let subscriptionData = response.data;
+
+        console.log("📝 Response data:", subscriptionData);
+        console.log("📝 Data type:", typeof subscriptionData);
+        console.log("📝 Is array:", Array.isArray(subscriptionData));
+
+        // Handle case where data might be wrapped in another object
+        if (subscriptionData && typeof subscriptionData === "object") {
+          // Case 1: data is directly an array
+          if (Array.isArray(subscriptionData)) {
+            console.log(
+              "📝 Data is direct array, length:",
+              subscriptionData.length
+            );
+          }
+          // Case 2: data is wrapped (e.g., { subscriptions: [...] })
+          else if (
+            subscriptionData.subscriptions &&
+            Array.isArray(subscriptionData.subscriptions)
+          ) {
+            console.log("📝 Data is wrapped in subscriptions field");
+            subscriptionData = subscriptionData.subscriptions;
+          }
+          // Case 3: data has items field (pagination format)
+          else if (
+            subscriptionData.items &&
+            Array.isArray(subscriptionData.items)
+          ) {
+            console.log("📝 Data is wrapped in items field");
+            subscriptionData = subscriptionData.items;
+          }
+          // Case 4: data has data field (nested data)
+          else if (
+            subscriptionData.data &&
+            Array.isArray(subscriptionData.data)
+          ) {
+            console.log("📝 Data is nested in data field");
+            subscriptionData = subscriptionData.data;
+          }
+          // Case 5: single object, wrap in array
+          else if (!Array.isArray(subscriptionData) && subscriptionData.id) {
+            console.log("📝 Data is single object, wrapping in array");
+            subscriptionData = [subscriptionData];
+          }
+          // Case 6: empty object or null
+          else {
+            console.log(
+              "📝 Data is empty or unknown format, defaulting to empty array"
+            );
+            subscriptionData = [];
+          }
+        } else {
+          // Data is null, undefined, or primitive - default to empty array
+          console.log("📝 Data is null/undefined, defaulting to empty array");
+          subscriptionData = [];
+        }
+
+        // Ensure we have an array before mapping
+        if (Array.isArray(subscriptionData)) {
+          const convertedSubscriptions = subscriptionData.map(
+            convertSubscriptionFromBackend
+          );
+          setSubscriptions(convertedSubscriptions);
+          setError(null);
+
+          console.log(
+            "📝 Subscriptions loaded successfully:",
+            convertedSubscriptions.length
+          );
+        } else {
+          console.error("📝 Final data is not an array:", subscriptionData);
+          setSubscriptions([]);
+          setError("Format data tidak valid");
+        }
       } else {
-        notifications.error({
-          title: "Gagal memuat langganan 😔",
-          description: response.error || "Terjadi kesalahan saat memuat data",
-          action: {
-            label: "Coba Lagi",
-            onClick: () => fetchSubscriptions(),
-          },
-        });
+        // Handle API errors
+        const errorMessage = response.error || "Gagal memuat data";
+        console.log("📝 API error:", errorMessage);
+
+        if (
+          errorMessage.includes("network") ||
+          errorMessage.includes("fetch")
+        ) {
+          setError("Koneksi bermasalah");
+        } else if (
+          errorMessage.includes("401") ||
+          errorMessage.includes("unauthorized")
+        ) {
+          setError("Sesi login berakhir");
+        } else {
+          setError("Gagal memuat data langganan");
+        }
       }
     } catch (error) {
-      notifications.networkError();
+      console.error("📝 Subscription fetch error:", error);
+
+      // Handle different types of errors
+      if (error instanceof TypeError && error.message.includes("map")) {
+        console.error("📝 Data format error - data is not an array");
+        setError("Format data tidak sesuai");
+      } else if (
+        error instanceof TypeError &&
+        error.message.includes("fetch")
+      ) {
+        setError("Koneksi bermasalah");
+      } else {
+        setError("Gagal memuat data");
+      }
     } finally {
       setLoading(false);
     }
@@ -302,81 +406,15 @@ export function useSubscription(userId?: string) {
     }
   };
 
-  // Bulk operations
-  const pauseAllSubscriptions = async (pauseUntil?: Date) => {
-    const activeSubscriptions = subscriptions.filter(
-      (s) => s.status === "active"
-    );
-
-    if (activeSubscriptions.length === 0) {
-      notifications.warning({
-        title: "Tidak ada langganan aktif",
-        description: "Tidak ada langganan yang bisa dijeda saat ini",
-      });
-      return false;
-    }
-
-    const confirmed = await new Promise<boolean>((resolve) => {
-      notifications.warning({
-        title: `Jeda ${activeSubscriptions.length} langganan? 🤔`,
-        description: "Semua langganan aktif akan dijeda bersamaan",
-        duration: 10000,
-        action: {
-          label: "Ya, Jeda Semua",
-          onClick: () => resolve(true),
-        },
-      });
-
-      setTimeout(() => resolve(false), 10000);
-    });
-
-    if (!confirmed) return false;
-
-    try {
-      setLoading(true);
-      const results = await Promise.allSettled(
-        activeSubscriptions.map((sub) => pauseSubscription(sub.id, pauseUntil))
-      );
-
-      const successful = results.filter((r) => r.status === "fulfilled").length;
-      const failed = results.length - successful;
-
-      if (successful > 0) {
-        notifications.success({
-          title: `${successful} langganan berhasil dijeda`,
-          description:
-            failed > 0 ? `${failed} langganan gagal dijeda` : undefined,
-        });
-      }
-
-      if (failed > 0) {
-        notifications.error({
-          title: `${failed} langganan gagal dijeda`,
-          description: "Coba jeda satu per satu untuk langganan yang gagal",
-        });
-      }
-
-      return successful > 0;
-    } catch (error) {
-      notifications.error({
-        title: "Gagal menjeda langganan",
-        description: "Terjadi kesalahan saat menjeda langganan secara massal",
-      });
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return {
     subscriptions,
     loading,
+    error,
     createSubscription,
     pauseSubscription,
     cancelSubscription,
     reactivateSubscription,
     updateSubscription,
-    pauseAllSubscriptions,
     refetch: fetchSubscriptions,
     activeSubscriptions: subscriptions.filter((s) => s.status === "active"),
     pausedSubscriptions: subscriptions.filter((s) => s.status === "paused"),

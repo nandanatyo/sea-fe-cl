@@ -1,10 +1,15 @@
-// lib/hooks/use-auth.ts - Updated with TanStack Query
+// lib/hooks/use-auth.ts - Clean version without debug UI
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { authService, type LoginData, type RegisterData } from "@/lib/api/auth";
 import { adminService } from "@/lib/api/admin";
+import { userService, type UpdateProfileData } from "@/lib/api/user";
 import { notifications } from "@/lib/utils/notifications";
-import { User, convertUserFromBackend } from "@/lib/types";
+import {
+  User,
+  convertUserFromBackend,
+  type RegisterFormData,
+} from "@/lib/types";
 import { ROUTES } from "@/lib/constants";
 
 // Query keys for TanStack Query
@@ -48,6 +53,7 @@ export function useAuth() {
   const loginMutation = useMutation({
     mutationFn: async (data: LoginData) => {
       const response = await authService.login(data);
+
       if (!response.success) {
         throw new Error(response.error || "Login failed");
       }
@@ -71,11 +77,12 @@ export function useAuth() {
         });
 
         // Navigate based on role
-        if (convertedUser.role === "admin") {
-          router.push(ROUTES.DASHBOARD.ADMIN);
-        } else {
-          router.push(ROUTES.DASHBOARD.USER);
-        }
+        const targetRoute =
+          convertedUser.role === "admin"
+            ? ROUTES.DASHBOARD.ADMIN
+            : ROUTES.DASHBOARD.USER;
+
+        router.push(targetRoute);
       }
     },
     onError: (error: Error) => {
@@ -107,6 +114,7 @@ export function useAuth() {
       };
 
       const response = await authService.register(backendData);
+
       if (!response.success) {
         throw new Error(response.error || "Registration failed");
       }

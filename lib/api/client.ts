@@ -1,4 +1,4 @@
-// lib/api/client.ts - Updated to use access token only
+// lib/api/client.ts - Enhanced with better response format handling
 import { ApiResponse } from "@/lib/types";
 import { notifications } from "@/lib/utils/notifications";
 
@@ -8,6 +8,8 @@ class ApiClient {
   constructor() {
     this.baseURL =
       process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1";
+
+    console.log("🌐 API Client initialized with base URL:", this.baseURL);
   }
 
   private async request<T>(
@@ -17,6 +19,20 @@ class ApiClient {
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
 
+    // Check network connectivity first
+    if (typeof window !== "undefined" && !navigator.onLine) {
+      const errorResponse = {
+        success: false,
+        error: "Tidak ada koneksi internet",
+      };
+
+      if (showErrorNotification) {
+        notifications.networkError();
+      }
+
+      return errorResponse;
+    }
+
     const config: RequestInit = {
       headers: {
         "Content-Type": "application/json",
@@ -25,7 +41,7 @@ class ApiClient {
       ...options,
     };
 
-    // Add auth token if available - using only access token
+    // Add auth token if available
     const token = this.getAccessToken();
     if (token) {
       config.headers = {
@@ -35,7 +51,20 @@ class ApiClient {
     }
 
     try {
+      console.log(`🌐 API Request: ${options.method || "GET"} ${url}`);
+      console.log(`🌐 Request headers:`, config.headers);
+
+      if (config.body) {
+        console.log(`🌐 Request body:`, config.body);
+      }
+
       const response = await fetch(url, config);
+
+      console.log(`🌐 API Response: ${response.status} ${response.statusText}`);
+      console.log(
+        `🌐 Response headers:`,
+        Object.fromEntries(response.headers.entries())
+      );
 
       // Handle non-JSON responses (e.g., 204 No Content)
       if (response.status === 204) {
@@ -46,13 +75,49 @@ class ApiClient {
         };
       }
 
-      const data = await response.json();
+      let data;
+      let rawResponseText = "";
+
+      try {
+        // Get raw response text first for debugging
+        rawResponseText = await response.text();
+        console.log(`🌐 Raw response text:`, rawResponseText);
+
+        // Try to parse as JSON
+        if (rawResponseText) {
+          data = JSON.parse(rawResponseText);
+          console.log(`🌐 Parsed response data:`, data);
+        } else {
+          data = null;
+        }
+      } catch (parseError) {
+        console.error("🌐 Failed to parse response as JSON:", parseError);
+        console.error("🌐 Raw response was:", rawResponseText);
+
+        const errorResponse = {
+          success: false,
+          error: `Server response tidak valid (${
+            response.status
+          }): ${rawResponseText.substring(0, 100)}`,
+        };
+
+        if (showErrorNotification) {
+          notifications.error({
+            title: "Server bermasalah 🔧",
+            description: "Response server tidak bisa dibaca",
+          });
+        }
+
+        return errorResponse;
+      }
 
       if (!response.ok) {
         const errorResponse = {
           success: false,
-          error: data.error || data.message || `HTTP ${response.status}`,
+          error: data?.error || data?.message || `HTTP ${response.status}`,
         };
+
+        console.error(`🌐 API Error: ${response.status}`, data);
 
         // Show appropriate error notification based on status code
         if (showErrorNotification) {
@@ -62,22 +127,66 @@ class ApiClient {
         return errorResponse;
       }
 
-      return {
+      // Handle different response formats from backend
+      let responseData = data;
+
+      // Backend might return data in different formats:
+      // 1. Direct data: { "id": "123", "name": "..." }
+      // 2. Wrapped in data field: { "data": [...], "message": "success" }
+      // 3. Wrapped with metadata: { "data": [...], "meta": {...}, "message": "success" }
+
+      if (data && typeof data === "object") {
+        // If response has a 'data' field, use that as the main data
+        if (data.data !== undefined) {
+          responseData = data.data;
+          console.log(`🌐 Extracted data from response.data:`, responseData);
+        }
+        // If response has items field (pagination)
+        else if (data.items !== undefined) {
+          responseData = data.items;
+          console.log(`🌐 Extracted data from response.items:`, responseData);
+        }
+        // Otherwise use the entire response as data
+        else {
+          responseData = data;
+          console.log(`🌐 Using entire response as data:`, responseData);
+        }
+      }
+
+      const apiResponse = {
         success: true,
-        data: data.data || data,
-        message: data.message,
+        data: responseData as T,
+        message: data?.message || "Success",
       };
+
+      console.log(`🌐 Final API Response:`, apiResponse);
+
+      return apiResponse;
     } catch (error) {
-      console.error("API Request failed:", error);
+      console.error("🌐 API Request failed:", error);
+
+      let errorMessage = "Network error occurred";
+      let isNetworkError = false;
+
+      if (error instanceof TypeError) {
+        if (error.message.includes("fetch")) {
+          errorMessage = "Gagal terhubung ke server";
+          isNetworkError = true;
+        } else if (error.message.includes("NetworkError")) {
+          errorMessage = "Koneksi internet bermasalah";
+          isNetworkError = true;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
 
       const errorResponse = {
         success: false,
-        error:
-          error instanceof Error ? error.message : "Network error occurred",
+        error: errorMessage,
       };
 
       if (showErrorNotification) {
-        if (error instanceof TypeError && error.message.includes("fetch")) {
+        if (isNetworkError) {
           notifications.networkError();
         } else {
           notifications.error({
@@ -97,7 +206,7 @@ class ApiClient {
         notifications.validationError(errorMessage);
         break;
       case 401:
-        // Clear invalid token and redirect to login
+        // Clear invalid token and show unauthorized message
         this.clearAuthToken();
         notifications.unauthorized();
         break;
@@ -145,7 +254,7 @@ class ApiClient {
     if (typeof window === "undefined") return;
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
-    localStorage.removeItem("refresh_token"); // Clean up old refresh token if exists
+    localStorage.removeItem("refresh_token");
   }
 
   // Public methods with optional error notification control

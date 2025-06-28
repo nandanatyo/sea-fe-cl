@@ -1,5 +1,5 @@
-// lib/hooks/use-auth.ts - Updated with access token only + enhanced notifications
-import { useState, useEffect } from "react";
+// lib/hooks/use-auth.ts - Updated with TanStack Query
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { authService, type LoginData, type RegisterData } from "@/lib/api/auth";
 import { adminService } from "@/lib/api/admin";
@@ -7,37 +7,58 @@ import { notifications } from "@/lib/utils/notifications";
 import { User, convertUserFromBackend } from "@/lib/types";
 import { ROUTES } from "@/lib/constants";
 
+// Query keys for TanStack Query
+export const authQueryKeys = {
+  currentUser: ["auth", "currentUser"] as const,
+  profile: ["auth", "profile"] as const,
+};
+
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const initAuth = () => {
-      if (authService.validateToken()) {
-        const currentUser = authService.getCurrentUser();
-        if (currentUser) {
-          setUser(convertUserFromBackend(currentUser));
-        }
-      } else {
-        // Clear invalid data
+  // Query to get current user
+  const {
+    data: user,
+    isLoading,
+    error: userError,
+    refetch: refetchUser,
+  } = useQuery({
+    queryKey: authQueryKeys.currentUser,
+    queryFn: async (): Promise<User | null> => {
+      // Check if we have valid token and user data
+      if (!authService.validateToken()) {
         authService.removeAuthToken();
+        return null;
       }
-      setLoading(false);
-    };
 
-    initAuth();
-  }, []);
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) {
+        authService.removeAuthToken();
+        return null;
+      }
 
-  const login = async (data: LoginData) => {
-    try {
-      setLoading(true);
+      return convertUserFromBackend(currentUser);
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: false,
+  });
 
+  // Login mutation
+  const loginMutation = useMutation({
+    mutationFn: async (data: LoginData) => {
       const response = await authService.login(data);
+      if (!response.success) {
+        throw new Error(response.error || "Login failed");
+      }
+      return response.data;
+    },
+    onSuccess: (data) => {
+      if (data) {
+        const convertedUser = convertUserFromBackend(data.user);
 
-      if (response.success && response.data) {
-        const convertedUser = convertUserFromBackend(response.data.user);
-        setUser(convertedUser);
+        // Update the query cache with new user data
+        queryClient.setQueryData(authQueryKeys.currentUser, convertedUser);
 
         // Success notification
         notifications.success({
@@ -55,49 +76,125 @@ export function useAuth() {
         } else {
           router.push(ROUTES.DASHBOARD.USER);
         }
+      }
+    },
+    onError: (error: Error) => {
+      notifications.error({
+        title: "Login gagal 😔",
+        description: error.message || "Email/nomor HP atau password salah",
+        action: {
+          label: "Coba Lagi",
+          onClick: () => {
+            const emailInput = document.querySelector(
+              'input[type="email"]'
+            ) as HTMLInputElement;
+            if (emailInput) emailInput.focus();
+          },
+        },
+      });
+    },
+  });
 
-        return true;
-      } else {
-        notifications.error({
-          title: "Login gagal 😔",
-          description: response.error || "Email/nomor HP atau password salah",
+  // Register mutation
+  const registerMutation = useMutation({
+    mutationFn: async (data: RegisterFormData) => {
+      // Convert frontend data to backend format
+      const backendData: RegisterData = {
+        name: data.fullName,
+        phone: data.phone,
+        password: data.password,
+        email: data.email,
+      };
+
+      const response = await authService.register(backendData);
+      if (!response.success) {
+        throw new Error(response.error || "Registration failed");
+      }
+      return response.data;
+    },
+    onSuccess: (data) => {
+      if (data) {
+        // Auto login after successful registration
+        const convertedUser = convertUserFromBackend(data.user);
+
+        // Update the query cache with new user data
+        queryClient.setQueryData(authQueryKeys.currentUser, convertedUser);
+
+        notifications.success({
+          title: "Akun berhasil dibuat! 🎉",
+          description:
+            "Selamat datang di keluarga SEA Catering! Mari mulai hidup sehat!",
+          duration: 6000,
           action: {
-            label: "Coba Lagi",
+            label: "Mulai Tour",
             onClick: () => {
-              const emailInput = document.querySelector(
-                'input[type="email"]'
-              ) as HTMLInputElement;
-              if (emailInput) emailInput.focus();
+              console.log("Start onboarding tour");
             },
           },
         });
-        return false;
+
+        router.push(ROUTES.DASHBOARD.USER);
+      } else {
+        notifications.success({
+          title: "Registrasi berhasil! 🎉",
+          description: "Akun telah dibuat. Silakan login untuk melanjutkan",
+          duration: 5000,
+        });
+
+        router.push(ROUTES.AUTH.LOGIN);
       }
-    } catch (error) {
-      notifications.error({
-        title: "Login gagal",
-        description:
-          "Terjadi kesalahan pada server. Coba lagi dalam beberapa menit.",
-        action: {
-          label: "Refresh",
-          onClick: () => window.location.reload(),
-        },
-      });
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    onError: (error: Error) => {
+      const errorMessage = error.message;
 
-  const adminLogin = async (data: { email: string; password: string }) => {
-    try {
-      setLoading(true);
+      // Handle specific registration errors
+      if (errorMessage.includes("email") && errorMessage.includes("sudah")) {
+        notifications.error({
+          title: "Email sudah terdaftar 📧",
+          description:
+            "Email ini sudah digunakan. Coba login atau gunakan email lain.",
+          action: {
+            label: "Login",
+            onClick: () => router.push(ROUTES.AUTH.LOGIN),
+          },
+        });
+      } else if (
+        errorMessage.includes("phone") &&
+        errorMessage.includes("sudah")
+      ) {
+        notifications.error({
+          title: "Nomor HP sudah terdaftar 📱",
+          description:
+            "Nomor ini sudah digunakan. Coba login atau gunakan nomor lain.",
+          action: {
+            label: "Login",
+            onClick: () => router.push(ROUTES.AUTH.LOGIN),
+          },
+        });
+      } else {
+        notifications.error({
+          title: "Registrasi gagal 😔",
+          description: errorMessage || "Terjadi kesalahan saat membuat akun",
+        });
+      }
+    },
+  });
 
+  // Admin login mutation
+  const adminLoginMutation = useMutation({
+    mutationFn: async (data: { email: string; password: string }) => {
       const response = await adminService.login(data);
+      if (!response.success) {
+        throw new Error(response.error || "Admin login failed");
+      }
+      return response.data;
+    },
+    onSuccess: (data) => {
+      if (data) {
+        const convertedUser = convertUserFromBackend(data.user);
 
-      if (response.success && response.data) {
-        const convertedUser = convertUserFromBackend(response.data.user);
-        setUser(convertedUser);
+        // Update the query cache with new user data
+        queryClient.setQueryData(authQueryKeys.currentUser, convertedUser);
 
         notifications.success({
           title: `Selamat datang, Admin ${
@@ -108,131 +205,33 @@ export function useAuth() {
         });
 
         router.push(ROUTES.DASHBOARD.ADMIN);
-        return true;
-      } else {
-        notifications.error({
-          title: "Login admin gagal 🚫",
-          description: response.error || "Email atau password admin salah",
-          action: {
-            label: "Hubungi IT",
-            onClick: () => {
-              window.open(
-                "mailto:it@seacatering.id?subject=Admin Login Issue",
-                "_blank"
-              );
-            },
-          },
-        });
-        return false;
       }
-    } catch (error) {
-      notifications.serverError();
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const register = async (data: RegisterFormData) => {
-    try {
-      setLoading(true);
-
-      // Convert frontend data to backend format
-      const backendData: RegisterData = {
-        name: data.fullName,
-        phone: data.phone,
-        password: data.password,
-        email: data.email,
-      };
-
-      const response = await authService.register(backendData);
-
-      if (response.success) {
-        if (response.data) {
-          // Auto login after successful registration
-          const convertedUser = convertUserFromBackend(response.data.user);
-          setUser(convertedUser);
-
-          notifications.success({
-            title: "Akun berhasil dibuat! 🎉",
-            description:
-              "Selamat datang di keluarga SEA Catering! Mari mulai hidup sehat!",
-            duration: 6000,
-            action: {
-              label: "Mulai Tour",
-              onClick: () => {
-                // Could trigger an onboarding tour
-                console.log("Start onboarding tour");
-              },
-            },
-          });
-
-          router.push(ROUTES.DASHBOARD.USER);
-        } else {
-          notifications.success({
-            title: "Registrasi berhasil! 🎉",
-            description: "Akun telah dibuat. Silakan login untuk melanjutkan",
-            duration: 5000,
-          });
-
-          router.push(ROUTES.AUTH.LOGIN);
-        }
-        return true;
-      } else {
-        // Handle specific registration errors
-        if (
-          response.error?.includes("email") &&
-          response.error?.includes("sudah")
-        ) {
-          notifications.error({
-            title: "Email sudah terdaftar 📧",
-            description:
-              "Email ini sudah digunakan. Coba login atau gunakan email lain.",
-            action: {
-              label: "Login",
-              onClick: () => router.push(ROUTES.AUTH.LOGIN),
-            },
-          });
-        } else if (
-          response.error?.includes("phone") &&
-          response.error?.includes("sudah")
-        ) {
-          notifications.error({
-            title: "Nomor HP sudah terdaftar 📱",
-            description:
-              "Nomor ini sudah digunakan. Coba login atau gunakan nomor lain.",
-            action: {
-              label: "Login",
-              onClick: () => router.push(ROUTES.AUTH.LOGIN),
-            },
-          });
-        } else {
-          notifications.error({
-            title: "Registrasi gagal 😔",
-            description:
-              response.error || "Terjadi kesalahan saat membuat akun",
-          });
-        }
-        return false;
-      }
-    } catch (error) {
+    },
+    onError: (error: Error) => {
       notifications.error({
-        title: "Registrasi gagal",
-        description: "Terjadi kesalahan pada server",
+        title: "Login admin gagal 🚫",
+        description: error.message || "Email atau password admin salah",
         action: {
-          label: "Coba Lagi",
-          onClick: () => window.location.reload(),
+          label: "Hubungi IT",
+          onClick: () => {
+            window.open(
+              "mailto:it@seacatering.id?subject=Admin Login Issue",
+              "_blank"
+            );
+          },
         },
       });
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
+  // Logout function
   const logout = () => {
     authService.removeAuthToken();
-    setUser(null);
+
+    // Clear all queries related to authenticated user
+    queryClient.setQueryData(authQueryKeys.currentUser, null);
+    queryClient.clear(); // Clear all cached data
+
     router.push(ROUTES.HOME);
 
     notifications.success({
@@ -246,6 +245,7 @@ export function useAuth() {
     });
   };
 
+  // Auth guards
   const requireAuth = (redirectTo: string = ROUTES.AUTH.LOGIN) => {
     if (!user || !authService.validateToken()) {
       notifications.warning({
@@ -280,136 +280,149 @@ export function useAuth() {
     return true;
   };
 
-  // OTP operations with success notifications
-  const sendOTP = async (
-    email: string,
-    type: "email_verification" | "password_reset"
-  ) => {
-    try {
+  // OTP operations
+  const sendOTPMutation = useMutation({
+    mutationFn: async ({
+      email,
+      type,
+    }: {
+      email: string;
+      type: "email_verification" | "password_reset";
+    }) => {
       const response = await authService.sendOTP({ email, type });
-
-      if (response.success) {
-        notifications.success({
-          title: "OTP berhasil dikirim! 📧",
-          description: `Kode verifikasi telah dikirim ke ${email}`,
-          duration: 5000,
-        });
-        return true;
-      } else {
-        notifications.error({
-          title: "Gagal mengirim OTP",
-          description: response.error || "Coba lagi dalam beberapa saat",
-        });
-        return false;
+      if (!response.success) {
+        throw new Error(response.error || "Failed to send OTP");
       }
-    } catch (error) {
-      notifications.networkError();
-      return false;
-    }
-  };
-
-  const verifyOTP = async (
-    email: string,
-    otp: string,
-    type: "email_verification" | "password_reset"
-  ) => {
-    try {
-      const response = await authService.verifyOTP({ email, otp, type });
-
-      if (response.success) {
-        notifications.success({
-          title: "OTP berhasil diverifikasi! ✅",
-          description:
-            type === "email_verification"
-              ? "Email kamu sudah terverifikasi"
-              : "OTP valid, silakan reset password",
-          duration: 4000,
-        });
-        return true;
-      } else {
-        notifications.error({
-          title: "OTP tidak valid",
-          description: response.error || "Pastikan kode yang dimasukkan benar",
-        });
-        return false;
-      }
-    } catch (error) {
-      notifications.networkError();
-      return false;
-    }
-  };
-
-  const forgotPassword = async (phone: string) => {
-    try {
-      const response = await authService.forgotPassword({ phone });
-
-      if (response.success) {
-        notifications.success({
-          title: "Link reset password dikirim! 📱",
-          description: `Instruksi reset password telah dikirim ke ${phone}`,
-          duration: 5000,
-        });
-        return true;
-      } else {
-        notifications.error({
-          title: "Gagal mengirim link reset",
-          description: response.error || "Pastikan nomor HP terdaftar",
-        });
-        return false;
-      }
-    } catch (error) {
-      notifications.networkError();
-      return false;
-    }
-  };
-
-  const resetPassword = async (
-    phone: string,
-    otp: string,
-    newPassword: string
-  ) => {
-    try {
-      const response = await authService.resetPassword({
-        phone,
-        otp,
-        new_password: newPassword,
+      return response;
+    },
+    onSuccess: (_, variables) => {
+      notifications.success({
+        title: "OTP berhasil dikirim! 📧",
+        description: `Kode verifikasi telah dikirim ke ${variables.email}`,
+        duration: 5000,
       });
+    },
+    onError: (error: Error) => {
+      notifications.error({
+        title: "Gagal mengirim OTP",
+        description: error.message || "Coba lagi dalam beberapa saat",
+      });
+    },
+  });
 
-      if (response.success) {
-        notifications.success({
-          title: "Password berhasil direset! 🔐",
-          description: "Silakan login dengan password baru kamu",
-          duration: 5000,
-        });
-        router.push(ROUTES.AUTH.LOGIN);
-        return true;
-      } else {
-        notifications.error({
-          title: "Gagal reset password",
-          description: response.error || "OTP mungkin sudah expired",
-        });
-        return false;
+  const verifyOTPMutation = useMutation({
+    mutationFn: async ({
+      email,
+      otp,
+      type,
+    }: {
+      email: string;
+      otp: string;
+      type: "email_verification" | "password_reset";
+    }) => {
+      const response = await authService.verifyOTP({ email, otp, type });
+      if (!response.success) {
+        throw new Error(response.error || "OTP verification failed");
       }
-    } catch (error) {
-      notifications.networkError();
-      return false;
-    }
-  };
+      return response;
+    },
+    onSuccess: (_, variables) => {
+      notifications.success({
+        title: "OTP berhasil diverifikasi! ✅",
+        description:
+          variables.type === "email_verification"
+            ? "Email kamu sudah terverifikasi"
+            : "OTP valid, silakan reset password",
+        duration: 4000,
+      });
+    },
+    onError: (error: Error) => {
+      notifications.error({
+        title: "OTP tidak valid",
+        description: error.message || "Pastikan kode yang dimasukkan benar",
+      });
+    },
+  });
 
   return {
+    // User data
     user,
-    loading,
-    login,
-    adminLogin,
-    register,
+    isLoading,
+    userError,
+
+    // Computed properties
+    isAuthenticated: !!user && authService.validateToken(),
+    isAdmin: user?.role === "admin",
+
+    // Mutations
+    login: loginMutation.mutate,
+    register: registerMutation.mutate,
+    adminLogin: adminLoginMutation.mutate,
+    sendOTP: sendOTPMutation.mutate,
+    verifyOTP: verifyOTPMutation.mutate,
+
+    // Loading states
+    isLoginLoading: loginMutation.isPending,
+    isRegisterLoading: registerMutation.isPending,
+    isAdminLoginLoading: adminLoginMutation.isPending,
+    isSendOTPLoading: sendOTPMutation.isPending,
+    isVerifyOTPLoading: verifyOTPMutation.isPending,
+
+    // Functions
     logout,
     requireAuth,
     requireAdmin,
-    sendOTP,
-    verifyOTP,
-    forgotPassword,
-    resetPassword,
-    isAuthenticated: !!user && authService.validateToken(),
-    isAdmin: user?.role === "admin",
+    refetchUser,
+
+    // Reset mutations
+    resetLoginMutation: loginMutation.reset,
+    resetRegisterMutation: registerMutation.reset,
+  };
+}
+
+// Separate hook for profile management
+export function useProfile() {
+  const queryClient = useQueryClient();
+
+  const { data: profile, isLoading } = useQuery({
+    queryKey: authQueryKeys.profile,
+    queryFn: async () => {
+      const response = await userService.getProfile();
+      if (!response.success) {
+        throw new Error(response.error);
+      }
+      return response.data;
+    },
+    enabled: !!authService.getAccessToken(),
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: UpdateProfileData) => {
+      const response = await userService.updateProfile(data);
+      if (!response.success) {
+        throw new Error(response.error || "Failed to update profile");
+      }
+      return response.data;
+    },
+    onSuccess: (data) => {
+      // Update both profile and current user queries
+      queryClient.setQueryData(authQueryKeys.profile, data);
+      queryClient.setQueryData(authQueryKeys.currentUser, data);
+
+      notifications.operationSuccess.profileUpdated();
+    },
+    onError: (error: Error) => {
+      notifications.error({
+        title: "Gagal memperbarui profil",
+        description: error.message,
+      });
+    },
+  });
+
+  return {
+    profile,
+    isLoading,
+    updateProfile: updateProfileMutation.mutate,
+    isUpdating: updateProfileMutation.isPending,
   };
 }

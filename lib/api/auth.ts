@@ -1,23 +1,23 @@
-// lib/api/auth.ts - Updated to use access token only
+// lib/api/auth.ts - Updated for better token management and debugging
 import { apiClient } from "./client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { User, ApiResponse } from "@/lib/types";
 
 export interface LoginData {
-  phone?: string; // Backend uses phone for login
-  email?: string; // Support both email and phone
+  phone?: string;
+  email?: string;
   password: string;
 }
 
 export interface RegisterData {
-  name: string; // Backend uses 'name' instead of 'fullName'
+  name: string;
   phone: string;
   password: string;
   email: string;
 }
 
 export interface RegisterFormData {
-  fullName: string; // Frontend form field
+  fullName: string;
   phone: string;
   password: string;
   email: string;
@@ -53,19 +53,34 @@ export interface ResetPasswordData {
 export const authService = {
   async login(data: LoginData): Promise<ApiResponse<AuthResponse>> {
     try {
+      console.log("🔐 Login attempt:", {
+        email: data.email,
+        phone: data.phone,
+      });
+
       const response = await apiClient.post<AuthResponse>(
         API_ENDPOINTS.AUTH.LOGIN,
         data
       );
 
+      console.log("🔐 Login response:", {
+        success: response.success,
+        hasData: !!response.data,
+        hasToken: !!response.data?.access_token,
+        hasUser: !!response.data?.user,
+      });
+
       if (response.success && response.data) {
-        // Store only access token and user data
-        localStorage.setItem("access_token", response.data.access_token);
-        localStorage.setItem("user", JSON.stringify(response.data.user));
+        // Store access token and user data
+        this.setAuthToken(response.data.access_token);
+        this.setCurrentUser(response.data.user);
+
+        console.log("🔐 Stored auth data successfully");
       }
 
       return response;
     } catch (error) {
+      console.error("🔐 Login error:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Login failed",
@@ -75,19 +90,36 @@ export const authService = {
 
   async register(data: RegisterData): Promise<ApiResponse<AuthResponse>> {
     try {
+      console.log("📝 Register attempt:", {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+      });
+
       const response = await apiClient.post<AuthResponse>(
         API_ENDPOINTS.AUTH.REGISTER,
         data
       );
 
+      console.log("📝 Register response:", {
+        success: response.success,
+        hasData: !!response.data,
+        hasToken: !!response.data?.access_token,
+        hasUser: !!response.data?.user,
+        message: response.message,
+      });
+
       if (response.success && response.data) {
         // Auto login after registration - store access token only
-        localStorage.setItem("access_token", response.data.access_token);
-        localStorage.setItem("user", JSON.stringify(response.data.user));
+        this.setAuthToken(response.data.access_token);
+        this.setCurrentUser(response.data.user);
+
+        console.log("📝 Stored auth data after registration");
       }
 
       return response;
     } catch (error) {
+      console.error("📝 Register error:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Registration failed",
@@ -164,19 +196,32 @@ export const authService = {
     }
   },
 
+  // Token management methods
   setAuthToken(token: string): void {
     if (typeof window !== "undefined") {
       localStorage.setItem("access_token", token);
+      console.log("🔑 Token stored:", token.substring(0, 20) + "...");
+    }
+  },
+
+  setCurrentUser(user: User): void {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("user", JSON.stringify(user));
+      console.log("👤 User stored:", {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      });
     }
   },
 
   removeAuthToken(): void {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("user");
-      // Remove refresh token storage since we're not using it anymore
-      localStorage.removeItem("refresh_token");
-    }
+    if (typeof window === "undefined") return;
+
+    console.log("🗑️ Removing auth data");
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("refresh_token"); // Clean up old refresh token if exists
   },
 
   getCurrentUser(): User | null {
@@ -184,44 +229,117 @@ export const authService = {
 
     try {
       const userData = localStorage.getItem("user");
-      return userData ? JSON.parse(userData) : null;
-    } catch {
+      const user = userData ? JSON.parse(userData) : null;
+
+      if (user) {
+        console.log("👤 Retrieved user:", {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+        });
+      } else {
+        console.log("👤 No user found in localStorage");
+      }
+
+      return user;
+    } catch (error) {
+      console.error("👤 Error parsing user data:", error);
+      this.removeAuthToken();
       return null;
     }
   },
 
   getAccessToken(): string | null {
     if (typeof window === "undefined") return null;
-    return localStorage.getItem("access_token");
+
+    const token = localStorage.getItem("access_token");
+
+    if (token) {
+      console.log("🔑 Retrieved token:", token.substring(0, 20) + "...");
+    } else {
+      console.log("🔑 No token found in localStorage");
+    }
+
+    return token;
   },
 
   // Check if user is authenticated
   isAuthenticated(): boolean {
-    return !!this.getAccessToken() && !!this.getCurrentUser();
+    const hasToken = !!this.getAccessToken();
+    const hasUser = !!this.getCurrentUser();
+    const isValid = this.validateToken();
+
+    console.log("🔍 Auth check:", { hasToken, hasUser, isValid });
+
+    return hasToken && hasUser && isValid;
   },
 
-  // Validate token (you can extend this to check expiration)
+  // Validate token (enhanced with better error handling)
   validateToken(): boolean {
     const token = this.getAccessToken();
     const user = this.getCurrentUser();
 
     if (!token || !user) {
+      console.log("❌ Validation failed: missing token or user");
       this.removeAuthToken();
       return false;
     }
 
-    // Add token expiration check here if backend provides exp claim
     try {
-      // Basic validation - you can enhance this
+      // Basic JWT validation
       const tokenParts = token.split(".");
       if (tokenParts.length !== 3) {
+        console.log("❌ Validation failed: invalid JWT format");
         this.removeAuthToken();
         return false;
       }
+
+      // Decode payload to check expiration
+      const payload = JSON.parse(atob(tokenParts[1]));
+      const currentTime = Math.floor(Date.now() / 1000);
+
+      if (payload.exp && payload.exp < currentTime) {
+        console.log("❌ Validation failed: token expired");
+        this.removeAuthToken();
+        return false;
+      }
+
+      console.log("✅ Token validation successful");
       return true;
-    } catch {
+    } catch (error) {
+      console.error("❌ Token validation error:", error);
       this.removeAuthToken();
       return false;
     }
+  },
+
+  // Get user info from token
+  getTokenInfo(): any {
+    const token = this.getAccessToken();
+    if (!token) return null;
+
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return {
+        userId: payload.user_id,
+        email: payload.email,
+        role: payload.role,
+        exp: payload.exp,
+        iat: payload.iat,
+      };
+    } catch (error) {
+      console.error("Error decoding token:", error);
+      return null;
+    }
+  },
+
+  // Debug method to check auth state
+  debugAuthState(): void {
+    console.log("🔍 === AUTH DEBUG ===");
+    console.log("Token:", this.getAccessToken()?.substring(0, 20) + "...");
+    console.log("User:", this.getCurrentUser());
+    console.log("Token Info:", this.getTokenInfo());
+    console.log("Is Authenticated:", this.isAuthenticated());
+    console.log("==================");
   },
 };

@@ -1,3 +1,4 @@
+// components/forms/auth/login-form.tsx - Updated with TanStack Query
 "use client";
 
 import { useState } from "react";
@@ -7,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Mail, Lock } from "lucide-react";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useFormValidation } from "@/lib/hooks/use-form-validation";
-import { useApiError } from "@/hooks/use-api-error";
 import { loginSchema, type LoginFormData } from "@/lib/validations/auth";
 import { PasswordInput } from "./password-input";
 import { RetryButton } from "@/components/common/retry-button";
@@ -18,8 +18,7 @@ const initialValues: LoginFormData = {
 };
 
 export function LoginForm() {
-  const { login, loading } = useAuth();
-  const { handleError } = useApiError();
+  const { login, isLoginLoading, resetLoginMutation } = useAuth();
   const [hasError, setHasError] = useState(false);
 
   const { values, errors, setValue, validate, reset } = useFormValidation(
@@ -31,19 +30,30 @@ export function LoginForm() {
     e.preventDefault();
     setHasError(false);
 
+    // Reset any previous mutation errors
+    resetLoginMutation();
+
     const isValid = await validate();
     if (!isValid) return;
 
+    // Debug the login attempt
+    console.log("🔐 Login attempt with:", {
+      email: values.email,
+      hasPassword: !!values.password,
+    });
+
     try {
-      await login(values);
+      // Call the login mutation from useAuth hook
+      login(values);
     } catch (error) {
       setHasError(true);
-      handleError(error, "login");
+      console.error("🔐 Login form error:", error);
     }
   };
 
   const handleRetry = () => {
     setHasError(false);
+    resetLoginMutation();
     // Focus on first input
     const firstInput = document.querySelector(
       'input[type="email"]'
@@ -67,7 +77,8 @@ export function LoginForm() {
           onChange={(e) => setValue("email", e.target.value)}
           placeholder="nama@email.com"
           className="mt-2 h-12"
-          disabled={loading}
+          disabled={isLoginLoading}
+          autoComplete="email"
         />
         {errors.email && (
           <p className="text-red-500 text-sm mt-1">{errors.email}</p>
@@ -86,7 +97,7 @@ export function LoginForm() {
           onChange={(value) => setValue("password", value)}
           placeholder="Masukkan password kamu"
           className="mt-2 h-12"
-          disabled={loading}
+          disabled={isLoginLoading}
           error={errors.password}
         />
       </div>
@@ -104,11 +115,30 @@ export function LoginForm() {
         </div>
       )}
 
+      {/* Debug info in development */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="bg-gray-100 p-3 rounded text-xs">
+          <p>
+            <strong>Debug Info:</strong>
+          </p>
+          <p>Loading: {isLoginLoading ? "Yes" : "No"}</p>
+          <p>Form Valid: {Object.keys(errors).length === 0 ? "Yes" : "No"}</p>
+          <p>Has Error: {hasError ? "Yes" : "No"}</p>
+        </div>
+      )}
+
       <Button
         type="submit"
-        disabled={loading}
+        disabled={isLoginLoading || !values.email || !values.password}
         className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 h-12 text-lg font-semibold">
-        {loading ? "Sedang masuk..." : "🚀 Masuk Sekarang"}
+        {isLoginLoading ? (
+          <>
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+            Sedang masuk...
+          </>
+        ) : (
+          "🚀 Masuk Sekarang"
+        )}
       </Button>
     </form>
   );

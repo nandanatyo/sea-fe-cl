@@ -1,4 +1,4 @@
-// components/forms/auth/register-form.tsx
+// components/forms/auth/register-form.tsx - Updated with TanStack Query
 "use client";
 
 import { useState } from "react";
@@ -21,7 +21,7 @@ const initialValues: RegisterFormData = {
 };
 
 export function RegisterForm() {
-  const { register: registerUser, loading } = useAuth();
+  const { register, isRegisterLoading, resetRegisterMutation } = useAuth();
   const { values, errors, setValue, validate } = useFormValidation(
     initialValues,
     registerSchema
@@ -40,6 +40,9 @@ export function RegisterForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Reset any previous mutation errors
+    resetRegisterMutation();
+
     const isValid = await validate();
     if (!isValid) return;
 
@@ -51,13 +54,16 @@ export function RegisterForm() {
       return;
     }
 
-    // Convert form data to match backend expectations
-    await registerUser({
+    // Debug the form data being sent
+    console.log("📝 Form submission data:", {
       fullName: values.fullName,
       email: values.email,
       phone: values.phone,
-      password: values.password,
+      passwordLength: values.password.length,
     });
+
+    // Call the register mutation from useAuth hook
+    register(values);
   };
 
   return (
@@ -75,6 +81,7 @@ export function RegisterForm() {
           onChange={(e) => setValue("fullName", e.target.value)}
           placeholder="Masukkan nama lengkap kamu"
           className="mt-2 h-12"
+          disabled={isRegisterLoading}
         />
         {errors.fullName && (
           <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>
@@ -95,6 +102,7 @@ export function RegisterForm() {
           onChange={(e) => setValue("email", e.target.value)}
           placeholder="nama@email.com"
           className="mt-2 h-12"
+          disabled={isRegisterLoading}
         />
         {errors.email && (
           <p className="text-red-500 text-sm mt-1">{errors.email}</p>
@@ -114,6 +122,7 @@ export function RegisterForm() {
           onChange={(e) => setValue("phone", e.target.value)}
           placeholder="08123456789"
           className="mt-2 h-12"
+          disabled={isRegisterLoading}
         />
         {errors.phone && (
           <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
@@ -132,6 +141,7 @@ export function RegisterForm() {
           onChange={(value) => setValue("password", value)}
           placeholder="Buat password yang kuat"
           className="mt-2 h-12"
+          disabled={isRegisterLoading}
         />
         <PasswordRequirements password={values.password} />
       </div>
@@ -148,6 +158,7 @@ export function RegisterForm() {
           onChange={(value) => setValue("confirmPassword", value)}
           placeholder="Ketik ulang password kamu"
           className="mt-2 h-12"
+          disabled={isRegisterLoading}
         />
         {values.confirmPassword &&
           values.password !== values.confirmPassword && (
@@ -158,10 +169,26 @@ export function RegisterForm() {
           )}
       </div>
 
+      {/* Debug info in development */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="bg-gray-100 p-3 rounded text-xs">
+          <p>
+            <strong>Debug Info:</strong>
+          </p>
+          <p>Loading: {isRegisterLoading ? "Yes" : "No"}</p>
+          <p>Form Valid: {Object.keys(errors).length === 0 ? "Yes" : "No"}</p>
+          <p>Password Valid: {isPasswordValid() ? "Yes" : "No"}</p>
+          <p>
+            Passwords Match:{" "}
+            {values.password === values.confirmPassword ? "Yes" : "No"}
+          </p>
+        </div>
+      )}
+
       <Button
         type="submit"
         disabled={
-          loading ||
+          isRegisterLoading ||
           !isPasswordValid() ||
           values.password !== values.confirmPassword ||
           !values.fullName ||
@@ -169,7 +196,14 @@ export function RegisterForm() {
           !values.phone
         }
         className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 h-12 text-lg font-semibold">
-        {loading ? "Mendaftarkan..." : "🎉 Daftar Sekarang"}
+        {isRegisterLoading ? (
+          <>
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+            Mendaftarkan akun...
+          </>
+        ) : (
+          "🎉 Daftar Sekarang"
+        )}
       </Button>
     </form>
   );

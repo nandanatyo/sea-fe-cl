@@ -1,3 +1,4 @@
+// components/forms/subscription/subscription-form.tsx - Fixed version
 "use client";
 
 import { useMemo, useEffect, useState } from "react";
@@ -26,19 +27,23 @@ import {
   type SubscriptionFormData,
 } from "@/lib/validations/subscription";
 import { CITIES, MEAL_PLANS, MEAL_TYPES, DELIVERY_DAYS } from "@/lib/constants";
-import { calculateSubscriptionPrice } from "@/lib/utils/calculations";
+import { Plan } from "@/lib/types";
+import {
+  calculateSubscriptionPrice as utilCalculatePrice,
+  findPlanById,
+  validatePricingFormData,
+} from "@/lib/utils/calculations";
 import { PlanSelector } from "./plan-selector";
 import { MealTypeSelector } from "./meal-type-selector";
 import { DeliveryDaySelector } from "./delivery-day-selector";
 import { PriceSummary } from "./price-summary";
 import { ErrorFallback } from "@/components/common/error-fallback";
-import { RetryButton } from "@/components/common/retry-button";
 
 export function SubscriptionForm() {
   const { user } = useAuth();
   const { createSubscription, loading } = useSubscription(user?.id);
   const { handleError, handleSuccess } = useApiError();
-  const [availablePlans, setAvailablePlans] = useState(MEAL_PLANS);
+  const [availablePlans, setAvailablePlans] = useState<Plan[]>(MEAL_PLANS);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [planError, setPlanError] = useState<Error | null>(null);
 
@@ -65,43 +70,94 @@ export function SubscriptionForm() {
 
   const watchedFields = watch();
 
-  // Fetch available meal plans from backend with error handling
+  // Enhanced calculation function that works with both backend and frontend data
+  const calculateSubscriptionPrice = (
+    planId: string,
+    mealTypesCount: number,
+    deliveryDaysCount: number
+  ): number => {
+    if (!planId || mealTypesCount === 0 || deliveryDaysCount === 0) {
+      return 0;
+    }
+
+    const plan = findPlanById(planId, availablePlans);
+    if (!plan) {
+      console.log("❌ Plan not found for calculation:", planId);
+      return 0;
+    }
+
+    const totalPrice = plan.price * mealTypesCount * deliveryDaysCount * 4.3;
+    console.log("💰 Price calculation:", {
+      planId,
+      planPrice: plan.price,
+      mealTypesCount,
+      deliveryDaysCount,
+      totalPrice: Math.round(totalPrice),
+    });
+
+    return Math.round(totalPrice);
+  };
+
+  // Fetch available meal plans from backend with enhanced error handling
   useEffect(() => {
     const fetchMealPlans = async () => {
       try {
         setLoadingPlans(true);
         setPlanError(null);
 
+        console.log("📋 Fetching meal plans from backend...");
         const response = await mealPlansService.getActive();
 
+        console.log("📋 Backend response:", response);
+
         if (response.success && response.data && response.data.length > 0) {
-          // Convert backend meal plans to frontend format
-          const convertedPlans = response.data.map((backendPlan: MealPlan) => ({
-            id: backendPlan.id,
-            name: backendPlan.name,
-            subtitle: `Plan Premium`,
-            price: backendPlan.price,
-            originalPrice: Math.round(backendPlan.price * 1.2),
-            description: backendPlan.description,
-            image: backendPlan.image_url,
-            emoji: getEmojiForPlan(backendPlan.name),
-            features: backendPlan.features || [],
-            sampleMenus: getSampleMenusForPlan(backendPlan.name),
-            calories: getCaloriesForPlan(backendPlan.name),
-            servings: "1 porsi",
-            prepTime: "Siap santap",
-            popular: checkIfPopular(backendPlan.name),
-            badge: getBadgeForPlan(backendPlan.name),
-          }));
+          // Convert backend meal plans to frontend format with enhanced mapping
+          const convertedPlans = response.data.map((backendPlan: MealPlan) => {
+            const frontendPlan: Plan = {
+              id: backendPlan.id,
+              name: backendPlan.name,
+              subtitle: getSubtitleForPlan(backendPlan.name),
+              price: backendPlan.price,
+              originalPrice: Math.round(backendPlan.price * 1.2),
+              description: backendPlan.description,
+              image: backendPlan.image_url,
+              emoji: getEmojiForPlan(backendPlan.name),
+              features: Array.isArray(backendPlan.features)
+                ? backendPlan.features
+                : typeof backendPlan.features === "string"
+                ? JSON.parse(backendPlan.features)
+                : getDefaultFeaturesForPlan(backendPlan.name),
+              sampleMenus: getSampleMenusForPlan(backendPlan.name),
+              calories: getCaloriesForPlan(backendPlan.name),
+              servings: "1 porsi",
+              prepTime: "Siap santap",
+              popular: checkIfPopular(backendPlan.name),
+              badge: getBadgeForPlan(backendPlan.name),
+            };
+
+            console.log("📋 Converted plan:", {
+              id: frontendPlan.id,
+              name: frontendPlan.name,
+              price: frontendPlan.price,
+            });
+
+            return frontendPlan;
+          });
 
           setAvailablePlans(convertedPlans);
+          console.log(
+            "📋 Successfully loaded backend plans:",
+            convertedPlans.length
+          );
+
           notifications.success({
-            title: "Menu berhasil dimuat",
+            title: "Menu berhasil dimuat! 🍽️",
             description: `${convertedPlans.length} paket tersedia untuk kamu`,
             duration: 3000,
           });
         } else {
           // Use fallback static data
+          console.log("📋 No backend data, using fallback plans");
           setAvailablePlans(MEAL_PLANS);
           notifications.warning({
             title: "Menggunakan menu default",
@@ -109,7 +165,7 @@ export function SubscriptionForm() {
           });
         }
       } catch (error) {
-        console.error("Failed to fetch meal plans:", error);
+        console.error("📋 Failed to fetch meal plans:", error);
         setPlanError(error as Error);
         setAvailablePlans(MEAL_PLANS);
         handleError(error, "memuat paket makanan");
@@ -128,16 +184,29 @@ export function SubscriptionForm() {
     }
   }, [user, setValue]);
 
+  // Enhanced total price calculation with better debugging
   const totalPrice = useMemo(() => {
-    return calculateSubscriptionPrice(
+    const price = utilCalculatePrice(
       watchedFields.plan,
-      watchedFields.mealTypes.length,
-      watchedFields.deliveryDays.length
+      watchedFields.mealTypes?.length || 0,
+      watchedFields.deliveryDays?.length || 0,
+      availablePlans // Pass available plans for accurate calculation
     );
+
+    console.log("💰 Total price recalculated:", {
+      plan: watchedFields.plan,
+      mealTypesCount: watchedFields.mealTypes?.length || 0,
+      deliveryDaysCount: watchedFields.deliveryDays?.length || 0,
+      totalPrice: price,
+      availablePlansCount: availablePlans.length,
+    });
+
+    return price;
   }, [
     watchedFields.plan,
-    watchedFields.mealTypes.length,
-    watchedFields.deliveryDays.length,
+    watchedFields.mealTypes?.length,
+    watchedFields.deliveryDays?.length,
+    availablePlans, // Add this dependency to recalculate when plans change
   ]);
 
   const handleMealTypeChange = (mealTypeId: string, checked: boolean) => {
@@ -157,6 +226,7 @@ export function SubscriptionForm() {
   };
 
   const handlePlanChange = (planId: string) => {
+    console.log("📋 Plan changed to:", planId);
     setValue("plan", planId, { shouldValidate: true });
   };
 
@@ -172,6 +242,25 @@ export function SubscriptionForm() {
       });
       return;
     }
+
+    // Validate pricing data before submission
+    const validation = validatePricingFormData({
+      planId: data.plan,
+      mealTypesCount: data.mealTypes?.length || 0,
+      deliveryDaysCount: data.deliveryDays?.length || 0,
+      availablePlans,
+    });
+
+    if (!validation.isValid) {
+      notifications.validationError(validation.errors.join(", "));
+      return;
+    }
+
+    console.log("📝 Form submission:", {
+      ...data,
+      totalPrice: Math.round(totalPrice),
+      selectedPlan: validation.plan,
+    });
 
     try {
       const success = await createSubscription({
@@ -192,11 +281,19 @@ export function SubscriptionForm() {
   };
 
   const handleRetryPlans = async () => {
-    // Force refetch meal plans
     window.location.reload();
   };
 
-  // Helper functions for plan conversion
+  // Enhanced helper functions with better defaults
+  const getSubtitleForPlan = (name: string): string => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes("diet")) return "Si Langsing Sehat";
+    if (lowerName.includes("protein")) return "Si Jagoan Otot";
+    if (lowerName.includes("royal") || lowerName.includes("premium"))
+      return "Si Mewah Bergizi";
+    return "Plan Premium";
+  };
+
   const getEmojiForPlan = (name: string): string => {
     const lowerName = name.toLowerCase();
     if (lowerName.includes("diet")) return "💚";
@@ -204,6 +301,40 @@ export function SubscriptionForm() {
     if (lowerName.includes("royal") || lowerName.includes("premium"))
       return "👑";
     return "🍽️";
+  };
+
+  const getDefaultFeaturesForPlan = (name: string): string[] => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes("diet")) {
+      return [
+        "🌾 Nasi merah organik dari Cianjur",
+        "🥬 Sayuran hidroponik segar",
+        "🍗 Protein tanpa lemak berlebih",
+        "👩‍⚕️ Disetujui ahli gizi Indonesia",
+      ];
+    }
+    if (lowerName.includes("protein")) {
+      return [
+        "🥩 Daging sapi pilihan grade A",
+        "🐟 Ikan salmon & tuna segar",
+        "🥚 Telur omega-3 premium",
+        "💪 Formula khusus muscle building",
+      ];
+    }
+    if (lowerName.includes("royal") || lowerName.includes("premium")) {
+      return [
+        "👑 Bahan premium imported",
+        "👨‍🍳 Dimasak chef berpengalaman",
+        "🍽️ Presentasi restaurant-quality",
+        "✨ Limited edition recipes",
+      ];
+    }
+    return [
+      "🍽️ Menu bergizi seimbang",
+      "✨ Bahan segar berkualitas",
+      "👨‍🍳 Dimasak dengan cinta",
+      "📦 Dikemas higienis",
+    ];
   };
 
   const getSampleMenusForPlan = (name: string): string[] => {
@@ -220,6 +351,13 @@ export function SubscriptionForm() {
         "Rendang Protein + Quinoa + Salad Alpukat",
         "Salmon Teriyaki + Nasi Shirataki + Edamame",
         "Ayam Geprek Sehat + Sweet Potato + Smoothie Protein",
+      ];
+    }
+    if (lowerName.includes("royal") || lowerName.includes("premium")) {
+      return [
+        "Wagyu Steak + Truffle Rice + Asparagus Grilled",
+        "Lobster Thermidor + Garlic Bread + Caesar Salad",
+        "Duck Confit + Mashed Potato + Ratatouille",
       ];
     }
     return [
@@ -376,7 +514,7 @@ export function SubscriptionForm() {
                 </div>
               </div>
 
-              {/* Plan Selection */}
+              {/* Plan Selection with loading state */}
               {loadingPlans ? (
                 <div className="space-y-4">
                   <div className="animate-pulse">
@@ -404,7 +542,7 @@ export function SubscriptionForm() {
               )}
 
               <MealTypeSelector
-                selectedMealTypes={watchedFields.mealTypes}
+                selectedMealTypes={watchedFields.mealTypes || []}
                 onMealTypeChange={handleMealTypeChange}
               />
               {errors.mealTypes && (
@@ -414,7 +552,7 @@ export function SubscriptionForm() {
               )}
 
               <DeliveryDaySelector
-                selectedDays={watchedFields.deliveryDays}
+                selectedDays={watchedFields.deliveryDays || []}
                 onDayChange={handleDeliveryDayChange}
               />
               {errors.deliveryDays && (
@@ -462,23 +600,57 @@ export function SubscriptionForm() {
 
               <Button
                 type="submit"
-                disabled={loading || totalPrice === 0 || !navigator.onLine}
+                disabled={
+                  loading ||
+                  totalPrice === 0 ||
+                  !navigator.onLine ||
+                  !watchedFields.plan
+                }
                 className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 h-14 text-lg font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed">
                 {loading
                   ? "Memproses..."
                   : !navigator.onLine
                   ? "Menunggu Koneksi..."
+                  : totalPrice === 0
+                  ? "Lengkapi Data untuk Melanjutkan"
                   : "🎉 Buat Langganan Sekarang"}
               </Button>
+
+              {/* Debug info for development */}
+              {process.env.NODE_ENV === "development" && (
+                <div className="bg-gray-100 p-3 rounded text-xs">
+                  <p>
+                    <strong>Debug Info:</strong>
+                  </p>
+                  <p>Loading: {loading ? "Yes" : "No"}</p>
+                  <p>Plan Selected: {watchedFields.plan || "None"}</p>
+                  <p>Meal Types: {watchedFields.mealTypes?.length || 0}</p>
+                  <p>
+                    Delivery Days: {watchedFields.deliveryDays?.length || 0}
+                  </p>
+                  <p>Total Price: Rp{totalPrice.toLocaleString()}</p>
+                  <p>Available Plans: {availablePlans.length}</p>
+                  <p>
+                    Button Disabled:{" "}
+                    {loading ||
+                    totalPrice === 0 ||
+                    !navigator.onLine ||
+                    !watchedFields.plan
+                      ? "Yes"
+                      : "No"}
+                  </p>
+                </div>
+              )}
             </form>
           </CardContent>
         </Card>
       </div>
 
+      {/* Enhanced Price Summary that works with both data sources */}
       <PriceSummary
         selectedPlan={watchedFields.plan}
-        mealTypesCount={watchedFields.mealTypes.length}
-        deliveryDaysCount={watchedFields.deliveryDays.length}
+        mealTypesCount={watchedFields.mealTypes?.length || 0}
+        deliveryDaysCount={watchedFields.deliveryDays?.length || 0}
         totalPrice={totalPrice}
         availablePlans={availablePlans}
       />

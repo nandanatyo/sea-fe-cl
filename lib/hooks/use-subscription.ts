@@ -1,4 +1,4 @@
-// lib/hooks/use-subscription.ts - Fixed with proper data format handling
+// lib/hooks/use-subscription.ts - Fixed to prevent object rendering
 import { useState, useEffect } from "react";
 import {
   subscriptionService,
@@ -11,6 +11,19 @@ import {
   convertSubscriptionFormData,
   CreateSubscriptionFormData,
 } from "@/lib/types";
+
+// Helper function to safely extract error message
+const getErrorMessage = (error: any): string => {
+  if (typeof error === "string") return error;
+  if (error?.message && typeof error.message === "string") return error.message;
+  if (error?.error && typeof error.error === "string") return error.error;
+  if (error?.errors && Array.isArray(error.errors)) {
+    return error.errors
+      .map((e: any) => (typeof e === "string" ? e : e.message || "Error"))
+      .join(", ");
+  }
+  return "Terjadi kesalahan yang tidak diketahui";
+};
 
 export function useSubscription(userId?: string) {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -112,7 +125,7 @@ export function useSubscription(userId?: string) {
         }
       } else {
         // Handle API errors
-        const errorMessage = response.error || "Gagal memuat data";
+        const errorMessage = getErrorMessage(response.error || response);
         console.log("📝 API error:", errorMessage);
 
         if (
@@ -132,14 +145,13 @@ export function useSubscription(userId?: string) {
     } catch (error) {
       console.error("📝 Subscription fetch error:", error);
 
-      // Handle different types of errors
-      if (error instanceof TypeError && error.message.includes("map")) {
+      // Handle different types of errors safely
+      const errorMessage = getErrorMessage(error);
+
+      if (errorMessage.includes("map")) {
         console.error("📝 Data format error - data is not an array");
         setError("Format data tidak sesuai");
-      } else if (
-        error instanceof TypeError &&
-        error.message.includes("fetch")
-      ) {
+      } else if (errorMessage.includes("fetch")) {
         setError("Koneksi bermasalah");
       } else {
         setError("Gagal memuat data");
@@ -154,46 +166,55 @@ export function useSubscription(userId?: string) {
   }, [userId]);
 
   const createSubscription = async (data: CreateSubscriptionFormData) => {
-    // Show loading notification with promise
-    const createPromise = async () => {
-      const backendData = convertSubscriptionFormData(data);
-      const response = await subscriptionService.create(backendData);
-
-      if (!response.success) {
-        throw new Error(response.error || "Gagal membuat langganan");
-      }
-
-      return response.data;
-    };
-
     try {
       setLoading(true);
 
-      const result = await notifications.promise(createPromise(), {
-        loading: "Membuat langganan baru...",
-        success: "Yeay! Langganan berhasil dibuat! 🎉",
-        error: (error) => error.message,
-      });
+      const backendData = convertSubscriptionFormData(data);
+      console.log("📝 Creating subscription with data:", backendData);
 
-      // Additional success notification with action
+      const response = await subscriptionService.create(backendData);
+
+      if (!response.success) {
+        const errorMessage = getErrorMessage(response.error || response);
+        throw new Error(errorMessage);
+      }
+
+      console.log("📝 Subscription created successfully:", response.data);
+
+      // Show success notification
       notifications.success({
-        title: "Langganan berhasil dibuat! 🎉",
+        title: "Yeay! Langganan berhasil dibuat! 🎉",
         description:
           "Tim kami akan segera menghubungi kamu untuk konfirmasi pembayaran dan pengiriman pertama.",
         duration: 6000,
         action: {
           label: "Lihat Detail",
           onClick: () => {
-            // Navigate to subscription detail or refresh list
             fetchSubscriptions();
           },
         },
       });
 
+      // Refresh subscriptions list
       await fetchSubscriptions();
       return true;
     } catch (error) {
-      // Error already handled by promise notification
+      console.error("📝 Create subscription error:", error);
+
+      const errorMessage = getErrorMessage(error);
+
+      notifications.error({
+        title: "Gagal membuat langganan 😔",
+        description: errorMessage,
+        action: {
+          label: "Coba Lagi",
+          onClick: () => {
+            // Could retry or just log
+            console.log("Retry create subscription");
+          },
+        },
+      });
+
       return false;
     } finally {
       setLoading(false);
@@ -201,7 +222,9 @@ export function useSubscription(userId?: string) {
   };
 
   const pauseSubscription = async (id: string, pauseUntil?: Date) => {
-    const pausePromise = async () => {
+    try {
+      setLoading(true);
+
       const startDate = new Date().toISOString();
       const endDate =
         pauseUntil?.toISOString() ||
@@ -213,23 +236,12 @@ export function useSubscription(userId?: string) {
       });
 
       if (!response.success) {
-        throw new Error(response.error || "Gagal menjeda langganan");
+        const errorMessage = getErrorMessage(response.error || response);
+        throw new Error(errorMessage);
       }
 
-      return response;
-    };
-
-    try {
-      setLoading(true);
-
-      await notifications.promise(pausePromise(), {
-        loading: "Menjeda langganan...",
-        success: "Langganan berhasil dijeda! ⏸️",
-        error: (error) => error.message,
-      });
-
-      notifications.info({
-        title: "Langganan dijeda",
+      notifications.success({
+        title: "Langganan berhasil dijeda! ⏸️",
         description: pauseUntil
           ? `Langganan akan otomatis aktif lagi pada ${pauseUntil.toLocaleDateString(
               "id-ID"
@@ -244,6 +256,14 @@ export function useSubscription(userId?: string) {
       await fetchSubscriptions();
       return true;
     } catch (error) {
+      console.error("📝 Pause subscription error:", error);
+
+      const errorMessage = getErrorMessage(error);
+      notifications.error({
+        title: "Gagal menjeda langganan",
+        description: errorMessage,
+      });
+
       return false;
     } finally {
       setLoading(false);
@@ -286,24 +306,15 @@ export function useSubscription(userId?: string) {
 
     if (!confirmed) return false;
 
-    const cancelPromise = async () => {
-      const response = await subscriptionService.cancel(id);
-
-      if (!response.success) {
-        throw new Error(response.error || "Gagal membatalkan langganan");
-      }
-
-      return response;
-    };
-
     try {
       setLoading(true);
 
-      await notifications.promise(cancelPromise(), {
-        loading: "Membatalkan langganan...",
-        success: "Langganan berhasil dibatalkan",
-        error: (error) => error.message,
-      });
+      const response = await subscriptionService.cancel(id);
+
+      if (!response.success) {
+        const errorMessage = getErrorMessage(response.error || response);
+        throw new Error(errorMessage);
+      }
 
       notifications.warning({
         title: "Langganan dibatalkan 😢",
@@ -321,6 +332,14 @@ export function useSubscription(userId?: string) {
       await fetchSubscriptions();
       return true;
     } catch (error) {
+      console.error("📝 Cancel subscription error:", error);
+
+      const errorMessage = getErrorMessage(error);
+      notifications.error({
+        title: "Gagal membatalkan langganan",
+        description: errorMessage,
+      });
+
       return false;
     } finally {
       setLoading(false);
@@ -328,27 +347,18 @@ export function useSubscription(userId?: string) {
   };
 
   const reactivateSubscription = async (id: string) => {
-    const reactivatePromise = async () => {
-      const response = await subscriptionService.resume(id);
-
-      if (!response.success) {
-        throw new Error(response.error || "Gagal mengaktifkan langganan");
-      }
-
-      return response;
-    };
-
     try {
       setLoading(true);
 
-      await notifications.promise(reactivatePromise(), {
-        loading: "Mengaktifkan kembali langganan...",
-        success: "Selamat datang kembali! 🎉",
-        error: (error) => error.message,
-      });
+      const response = await subscriptionService.resume(id);
+
+      if (!response.success) {
+        const errorMessage = getErrorMessage(response.error || response);
+        throw new Error(errorMessage);
+      }
 
       notifications.success({
-        title: "Langganan aktif lagi! 🎉",
+        title: "Selamat datang kembali! 🎉",
         description:
           "Pengiriman akan dimulai pada jadwal berikutnya. Siap lanjut hidup sehat!",
         action: {
@@ -363,6 +373,14 @@ export function useSubscription(userId?: string) {
       await fetchSubscriptions();
       return true;
     } catch (error) {
+      console.error("📝 Reactivate subscription error:", error);
+
+      const errorMessage = getErrorMessage(error);
+      notifications.error({
+        title: "Gagal mengaktifkan langganan",
+        description: errorMessage,
+      });
+
       return false;
     } finally {
       setLoading(false);
@@ -373,33 +391,32 @@ export function useSubscription(userId?: string) {
     id: string,
     data: Partial<CreateSubscriptionData>
   ) => {
-    const updatePromise = async () => {
-      const response = await subscriptionService.update(id, data);
-
-      if (!response.success) {
-        throw new Error(response.error || "Gagal memperbarui langganan");
-      }
-
-      return response;
-    };
-
     try {
       setLoading(true);
 
-      await notifications.promise(updatePromise(), {
-        loading: "Memperbarui langganan...",
-        success: "Langganan berhasil diperbarui! ✅",
-        error: (error) => error.message,
-      });
+      const response = await subscriptionService.update(id, data);
 
-      notifications.info({
-        title: "Perubahan tersimpan",
+      if (!response.success) {
+        const errorMessage = getErrorMessage(response.error || response);
+        throw new Error(errorMessage);
+      }
+
+      notifications.success({
+        title: "Langganan berhasil diperbarui! ✅",
         description: "Perubahan akan berlaku pada pengiriman berikutnya.",
       });
 
       await fetchSubscriptions();
       return true;
     } catch (error) {
+      console.error("📝 Update subscription error:", error);
+
+      const errorMessage = getErrorMessage(error);
+      notifications.error({
+        title: "Gagal memperbarui langganan",
+        description: errorMessage,
+      });
+
       return false;
     } finally {
       setLoading(false);

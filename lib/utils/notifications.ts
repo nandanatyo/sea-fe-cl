@@ -1,4 +1,4 @@
-// lib/utils/notifications.ts - Enhanced with more success notification patterns
+// lib/utils/notifications.ts - Fixed version to prevent object rendering
 import { toast } from "sonner";
 
 export interface NotificationOptions {
@@ -10,6 +10,19 @@ export interface NotificationOptions {
     onClick: () => void;
   };
 }
+
+// Helper function to safely extract error message
+const getErrorMessage = (error: any): string => {
+  if (typeof error === "string") return error;
+  if (error?.message && typeof error.message === "string") return error.message;
+  if (error?.error && typeof error.error === "string") return error.error;
+  if (error?.errors && Array.isArray(error.errors)) {
+    return error.errors
+      .map((e: any) => (typeof e === "string" ? e : e.message || "Error"))
+      .join(", ");
+  }
+  return "Terjadi kesalahan yang tidak diketahui";
+};
 
 export const notifications = {
   success: (options: NotificationOptions) => {
@@ -26,8 +39,14 @@ export const notifications = {
   },
 
   error: (options: NotificationOptions) => {
+    // Safely handle error description
+    const description =
+      typeof options.description === "string"
+        ? options.description
+        : getErrorMessage(options.description);
+
     toast.error(options.title, {
-      description: options.description,
+      description,
       duration: options.duration || 6000,
       action: options.action
         ? {
@@ -39,8 +58,13 @@ export const notifications = {
   },
 
   warning: (options: NotificationOptions) => {
+    const description =
+      typeof options.description === "string"
+        ? options.description
+        : getErrorMessage(options.description);
+
     toast.warning(options.title, {
-      description: options.description,
+      description,
       duration: options.duration || 5000,
       action: options.action
         ? {
@@ -78,7 +102,21 @@ export const notifications = {
       error: string | ((error: any) => string);
     }
   ) => {
-    return toast.promise(promise, options);
+    return toast.promise(promise, {
+      loading: options.loading,
+      success: (data) => {
+        return typeof options.success === "function"
+          ? options.success(data)
+          : options.success;
+      },
+      error: (error) => {
+        const errorMessage =
+          typeof options.error === "function"
+            ? options.error(error)
+            : options.error;
+        return getErrorMessage(errorMessage);
+      },
+    });
   },
 
   // Predefined success notifications for common operations
@@ -296,9 +334,10 @@ export const notifications = {
     });
   },
 
-  validationError: (message?: string) => {
+  validationError: (message?: string | any) => {
+    const errorMessage = getErrorMessage(message);
     toast.error("Data tidak valid ❌", {
-      description: message || "Periksa kembali data yang kamu masukkan",
+      description: errorMessage || "Periksa kembali data yang kamu masukkan",
     });
   },
 

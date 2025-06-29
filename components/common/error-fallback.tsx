@@ -1,3 +1,4 @@
+// components/common/error-fallback.tsx - Fixed to prevent object rendering
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -6,12 +7,28 @@ import { AlertTriangle, Home, RefreshCw } from "lucide-react";
 import { RetryButton } from "./retry-button";
 
 interface ErrorFallbackProps {
-  error?: Error;
+  error?: Error | any;
   resetError?: () => void;
   title?: string;
   description?: string;
   showDetails?: boolean;
 }
+
+// Helper function to safely extract error message
+const getErrorMessage = (error: any): string => {
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.message;
+  if (error?.message && typeof error.message === "string") return error.message;
+  if (error?.error && typeof error.error === "string") return error.error;
+  return "Terjadi kesalahan yang tidak diketahui";
+};
+
+// Helper function to safely extract error stack
+const getErrorStack = (error: any): string => {
+  if (error instanceof Error && error.stack) return error.stack;
+  if (error?.stack && typeof error.stack === "string") return error.stack;
+  return "Stack trace tidak tersedia";
+};
 
 export function ErrorFallback({
   error,
@@ -27,6 +44,9 @@ export function ErrorFallback({
   const handleReload = () => {
     window.location.reload();
   };
+
+  const errorMessage = getErrorMessage(error);
+  const errorStack = getErrorStack(error);
 
   return (
     <div className="min-h-[400px] flex items-center justify-center p-4">
@@ -46,10 +66,15 @@ export function ErrorFallback({
                 Detail Error (untuk developer)
               </summary>
               <div className="text-gray-700 max-h-32 overflow-auto">
-                <strong>Message:</strong> {error.message}
-                <br />
-                <strong>Stack:</strong>
-                <pre className="whitespace-pre-wrap mt-1">{error.stack}</pre>
+                <div>
+                  <strong>Message:</strong> {errorMessage}
+                </div>
+                <div className="mt-2">
+                  <strong>Stack:</strong>
+                </div>
+                <pre className="whitespace-pre-wrap mt-1 text-xs">
+                  {errorStack}
+                </pre>
               </div>
             </details>
           )}

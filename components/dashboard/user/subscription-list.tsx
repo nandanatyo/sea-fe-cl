@@ -1,3 +1,4 @@
+// components/dashboard/user/subscription-list.tsx - Fixed version
 "use client";
 
 import { useState } from "react";
@@ -64,6 +65,60 @@ export function SubscriptionList({
       default:
         return null;
     }
+  };
+
+  // Fixed handlePauseSubscription to properly pass Date object
+  const handlePauseSubscription = async (id: string, pauseUntil: Date) => {
+    console.log("📝 SubscriptionList handlePauseSubscription called:", {
+      id,
+      pauseUntil,
+      pauseUntilType: typeof pauseUntil,
+      isValidDate: pauseUntil instanceof Date && !isNaN(pauseUntil.getTime()),
+    });
+
+    if (!onPause) {
+      console.error("📝 onPause function not provided");
+      return false;
+    }
+
+    // Validate that pauseUntil is a proper Date object
+    if (!(pauseUntil instanceof Date) || isNaN(pauseUntil.getTime())) {
+      console.error("📝 Invalid pauseUntil date:", pauseUntil);
+      alert("Error: Tanggal tidak valid");
+      return false;
+    }
+
+    try {
+      return await onPause(id, pauseUntil);
+    } catch (error) {
+      console.error("📝 Error in handlePauseSubscription:", error);
+      return false;
+    }
+  };
+
+  const handleCancelSubscription = (id: string) => {
+    if (!onCancel) {
+      console.error("📝 onCancel function not provided");
+      return;
+    }
+
+    // Show confirmation dialog
+    const confirmed = confirm(
+      "Apakah kamu yakin ingin membatalkan langganan ini? Tindakan ini tidak dapat dibatalkan."
+    );
+
+    if (confirmed) {
+      onCancel(id);
+    }
+  };
+
+  const handleReactivateSubscription = (id: string) => {
+    if (!onReactivate) {
+      console.error("📝 onReactivate function not provided");
+      return;
+    }
+
+    onReactivate(id);
   };
 
   if (subscriptions.length === 0) {
@@ -226,7 +281,7 @@ export function SubscriptionList({
                   <PauseSubscriptionDialog
                     subscriptionId={subscription.id}
                     subscriptionName={`${plan?.name} - ${subscription.name}`}
-                    onPause={onPause}
+                    onPause={handlePauseSubscription}
                   />
                 )}
 
@@ -234,8 +289,8 @@ export function SubscriptionList({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-red-600 border-red-200"
-                    onClick={() => onCancel(subscription.id)}>
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={() => handleCancelSubscription(subscription.id)}>
                     <X className="h-4 w-4 mr-2" />
                     Batalkan
                   </Button>
@@ -246,8 +301,10 @@ export function SubscriptionList({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-green-600 border-green-200"
-                      onClick={() => onReactivate(subscription.id)}>
+                      className="text-green-600 border-green-200 hover:bg-green-50"
+                      onClick={() =>
+                        handleReactivateSubscription(subscription.id)
+                      }>
                       <Play className="h-4 w-4 mr-2" />
                       Aktifkan Lagi
                     </Button>

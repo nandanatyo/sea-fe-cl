@@ -1,13 +1,9 @@
-// lib/hooks/use-subscription.ts - Fixed to prevent object rendering
+// lib/hooks/use-subscription.ts - Fixed version
 import { useState, useEffect } from "react";
-import {
-  createPauseDateRange,
-  validatePauseDateRange,
-  formatDateID,
-} from "@/lib/utils/date";
 import {
   subscriptionService,
   type CreateSubscriptionData,
+  type PauseSubscriptionData,
 } from "@/lib/api/subscriptions";
 import { notifications } from "@/lib/utils/notifications";
 import {
@@ -30,6 +26,38 @@ const getErrorMessage = (error: any): string => {
   return "Terjadi kesalahan yang tidak diketahui";
 };
 
+// Helper function to safely create date
+const createSafeDate = (input?: Date | string | number): Date => {
+  if (!input) {
+    return new Date();
+  }
+
+  if (input instanceof Date) {
+    return isNaN(input.getTime()) ? new Date() : input;
+  }
+
+  try {
+    const date = new Date(input);
+    return isNaN(date.getTime()) ? new Date() : date;
+  } catch {
+    return new Date();
+  }
+};
+
+// Helper function to format date for Indonesian locale
+const formatDateID = (date: Date | string): string => {
+  try {
+    const dateObj = typeof date === "string" ? new Date(date) : date;
+    return dateObj.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return "Tanggal tidak valid";
+  }
+};
+
 export function useSubscription(userId?: string) {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(false);
@@ -47,71 +75,54 @@ export function useSubscription(userId?: string) {
 
       console.log("📝 Fetching subscriptions for user:", userId);
 
-      // Use silent error handling to avoid showing network error notifications
       const response = await subscriptionService.getMy();
 
       console.log("📝 Raw subscription response:", response);
 
       if (response.success) {
-        // Handle different response formats from backend
         let subscriptionData = response.data;
 
         console.log("📝 Response data:", subscriptionData);
-        console.log("📝 Data type:", typeof subscriptionData);
-        console.log("📝 Is array:", Array.isArray(subscriptionData));
 
-        // Handle case where data might be wrapped in another object
+        // Handle different response formats from backend
         if (subscriptionData && typeof subscriptionData === "object") {
-          // Case 1: data is directly an array
           if (Array.isArray(subscriptionData)) {
             console.log(
               "📝 Data is direct array, length:",
               subscriptionData.length
             );
-          }
-          // Case 2: data is wrapped (e.g., { subscriptions: [...] })
-          else if (
+          } else if (
             subscriptionData.subscriptions &&
             Array.isArray(subscriptionData.subscriptions)
           ) {
             console.log("📝 Data is wrapped in subscriptions field");
             subscriptionData = subscriptionData.subscriptions;
-          }
-          // Case 3: data has items field (pagination format)
-          else if (
+          } else if (
             subscriptionData.items &&
             Array.isArray(subscriptionData.items)
           ) {
             console.log("📝 Data is wrapped in items field");
             subscriptionData = subscriptionData.items;
-          }
-          // Case 4: data has data field (nested data)
-          else if (
+          } else if (
             subscriptionData.data &&
             Array.isArray(subscriptionData.data)
           ) {
             console.log("📝 Data is nested in data field");
             subscriptionData = subscriptionData.data;
-          }
-          // Case 5: single object, wrap in array
-          else if (!Array.isArray(subscriptionData) && subscriptionData.id) {
+          } else if (!Array.isArray(subscriptionData) && subscriptionData.id) {
             console.log("📝 Data is single object, wrapping in array");
             subscriptionData = [subscriptionData];
-          }
-          // Case 6: empty object or null
-          else {
+          } else {
             console.log(
               "📝 Data is empty or unknown format, defaulting to empty array"
             );
             subscriptionData = [];
           }
         } else {
-          // Data is null, undefined, or primitive - default to empty array
           console.log("📝 Data is null/undefined, defaulting to empty array");
           subscriptionData = [];
         }
 
-        // Ensure we have an array before mapping
         if (Array.isArray(subscriptionData)) {
           const convertedSubscriptions = subscriptionData.map(
             convertSubscriptionFromBackend
@@ -129,7 +140,6 @@ export function useSubscription(userId?: string) {
           setError("Format data tidak valid");
         }
       } else {
-        // Handle API errors
         const errorMessage = getErrorMessage(response.error || response);
         console.log("📝 API error:", errorMessage);
 
@@ -150,7 +160,6 @@ export function useSubscription(userId?: string) {
     } catch (error) {
       console.error("📝 Subscription fetch error:", error);
 
-      // Handle different types of errors safely
       const errorMessage = getErrorMessage(error);
 
       if (errorMessage.includes("map")) {
@@ -186,7 +195,6 @@ export function useSubscription(userId?: string) {
 
       console.log("📝 Subscription created successfully:", response.data);
 
-      // Show success notification
       notifications.success({
         title: "Yeay! Langganan berhasil dibuat! 🎉",
         description:
@@ -200,7 +208,6 @@ export function useSubscription(userId?: string) {
         },
       });
 
-      // Refresh subscriptions list
       await fetchSubscriptions();
       return true;
     } catch (error) {
@@ -214,7 +221,6 @@ export function useSubscription(userId?: string) {
         action: {
           label: "Coba Lagi",
           onClick: () => {
-            // Could retry or just log
             console.log("Retry create subscription");
           },
         },
@@ -226,32 +232,57 @@ export function useSubscription(userId?: string) {
     }
   };
 
-  const pauseSubscription = async (id: string, pauseUntil: Date) => {
+  const pauseSubscription = async (id: string, pauseUntil?: Date) => {
     try {
       setLoading(true);
 
+      // Current date and time
       const now = new Date();
 
-      // Validate that pauseUntil is in the future
-      if (pauseUntil <= now) {
-        throw new Error("Tanggal berakhir harus setelah hari ini");
+      // Set start_date to tomorrow (current time + 24 hours)
+      const startDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 1 day from now
+
+      const endDate = pauseUntil
+        ? new Date(pauseUntil)
+        : new Date(startDate.getTime() + 24 * 60 * 60 * 1000); // Minimal 1 hari dari start_date
+
+      // Validate dates
+      if (!startDate || isNaN(startDate.getTime())) {
+        throw new Error("Tanggal mulai tidak valid");
       }
 
-      // Prepare pause data with proper ISO format
-      const pauseData = {
-        start_date: now.toISOString(),
-        end_date: pauseUntil.toISOString(),
+      if (!endDate || isNaN(endDate.getTime())) {
+        throw new Error("Tanggal berakhir tidak valid");
+      }
+
+      // Ensure endDate is after startDate
+      if (endDate <= startDate) {
+        throw new Error("Tanggal berakhir harus setelah tanggal mulai");
+      }
+
+      // Ensure minimum duration (at least 24 hours from startDate)
+      const diffMs = endDate.getTime() - startDate.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      if (diffHours < 24) {
+        throw new Error("Durasi pause minimal 24 jam");
+      }
+
+      // Format tanggal dalam UTC ISO string (seperti format sukses di log)
+      // Backend expects: "2025-06-30T12:12:44.612144Z"
+
+      const pauseData: PauseSubscriptionData = {
+        start_date: startDate.toISOString(), // Use startDate here
+        end_date: endDate.toISOString(),
       };
 
       console.log("📝 Pause subscription request:", {
         subscriptionId: id,
-        startDate: pauseData.start_date,
-        endDate: pauseData.end_date,
-        startDisplay: formatDateID(pauseData.start_date),
-        endDisplay: formatDateID(pauseData.end_date),
-        durationDays: Math.ceil(
-          (pauseUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        ),
+        pauseData,
+        startDisplay: formatDateID(startDate), // Display startDate
+        endDisplay: formatDateID(endDate),
+        durationHours: diffHours,
+        durationDays: Math.ceil(diffHours / 24),
       });
 
       const response = await subscriptionService.pause(id, pauseData);
@@ -264,7 +295,7 @@ export function useSubscription(userId?: string) {
       notifications.success({
         title: "Langganan berhasil dijeda! ⏸️",
         description: `Langganan akan otomatis aktif lagi pada ${formatDateID(
-          pauseUntil
+          endDate
         )}`,
         duration: 6000,
         action: {
@@ -280,10 +311,11 @@ export function useSubscription(userId?: string) {
 
       const errorMessage = getErrorMessage(error);
 
-      // Handle specific backend errors
+      // Handle specific errors
       if (
         errorMessage.includes("invalid pause dates") ||
-        errorMessage.includes("Invalid pause dates")
+        errorMessage.includes("Invalid pause dates") ||
+        errorMessage.includes("toISOString")
       ) {
         notifications.error({
           title: "Format tanggal tidak valid ❌",
@@ -298,7 +330,8 @@ export function useSubscription(userId?: string) {
         });
       } else if (
         errorMessage.includes("duration") ||
-        errorMessage.includes("future")
+        errorMessage.includes("future") ||
+        errorMessage.includes("setelah")
       ) {
         notifications.error({
           title: "Tanggal tidak valid ⏰",
@@ -323,37 +356,9 @@ export function useSubscription(userId?: string) {
 
   const cancelSubscription = async (id: string) => {
     // Show confirmation before canceling
-    const confirmed = await new Promise<boolean>((resolve) => {
-      notifications.warning({
-        title: "Yakin ingin membatalkan? 🤔",
-        description:
-          "Langganan yang dibatalkan tidak dapat dikembalikan. Kamu bisa membuat langganan baru kapan saja.",
-        duration: 10000,
-        action: {
-          label: "Ya, Batalkan",
-          onClick: () => resolve(true),
-        },
-      });
-
-      // Also show alternative action
-      setTimeout(() => {
-        notifications.info({
-          title: "Atau jeda saja dulu? 💭",
-          description:
-            "Jika kamu hanya butuh istirahat sebentar, coba jeda langganan aja",
-          action: {
-            label: "Jeda Saja",
-            onClick: () => {
-              resolve(false);
-              pauseSubscription(id);
-            },
-          },
-        });
-      }, 2000);
-
-      // Auto resolve to false after 15 seconds
-      setTimeout(() => resolve(false), 15000);
-    });
+    const confirmed = confirm(
+      "Apakah kamu yakin ingin membatalkan langganan ini? Tindakan ini tidak dapat dibatalkan."
+    );
 
     if (!confirmed) return false;
 
@@ -415,7 +420,6 @@ export function useSubscription(userId?: string) {
         action: {
           label: "Lihat Jadwal",
           onClick: () => {
-            // Navigate to delivery schedule
             console.log("Show delivery schedule");
           },
         },

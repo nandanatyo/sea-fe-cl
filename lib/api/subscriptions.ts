@@ -1,4 +1,4 @@
-// lib/api/subscriptions.ts - Updated with success notifications
+// lib/api/subscriptions.ts - Fixed pause function
 import { apiClient } from "./client";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Subscription, ApiResponse, PaginatedResponse } from "@/lib/types";
@@ -64,8 +64,6 @@ export const subscriptionService = {
       );
 
       if (response.success) {
-        // Success notification handled in the hook layer
-        // But we can add a backup here
         if (response.data) {
           notifications.operationSuccess.subscriptionCreated("Langganan Baru");
         }
@@ -146,21 +144,22 @@ export const subscriptionService = {
     data: PauseSubscriptionData
   ): Promise<ApiResponse<void>> {
     try {
-      console.log("📝 Subscription pause request:", {
+      console.log("📝 Subscription pause request to backend:", {
         subscriptionId: id,
         pauseData: data,
+        endpoint: API_ENDPOINTS.SUBSCRIPTIONS.PAUSE(id),
       });
 
-      // Validate date formats before sending to backend
+      // Validate dates before sending
       const startDate = new Date(data.start_date);
       const endDate = new Date(data.end_date);
 
       if (isNaN(startDate.getTime())) {
-        throw new Error("Invalid start_date format. Expected ISO string.");
+        throw new Error("Invalid start_date format");
       }
 
       if (isNaN(endDate.getTime())) {
-        throw new Error("Invalid end_date format. Expected ISO string.");
+        throw new Error("Invalid end_date format");
       }
 
       if (endDate <= startDate) {
@@ -175,18 +174,13 @@ export const subscriptionService = {
         throw new Error("Pause duration must be at least 1 day");
       }
 
-      // Ensure dates are in proper ISO format with Z timezone
+      // Pastikan format tanggal dalam UTC ISO string
       const validatedData: PauseSubscriptionData = {
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
       };
 
-      console.log("📝 Validated pause data being sent to backend:", {
-        subscriptionId: id,
-        data: validatedData,
-        durationDays: diffDays,
-        endpoint: API_ENDPOINTS.SUBSCRIPTIONS.PAUSE(id),
-      });
+      console.log("📝 Validated pause data being sent:", validatedData);
 
       const response = await apiClient.put<void>(
         API_ENDPOINTS.SUBSCRIPTIONS.PAUSE(id),

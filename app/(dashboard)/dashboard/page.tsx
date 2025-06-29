@@ -1,4 +1,4 @@
-// app/(dashboard)/dashboard/page.tsx - Fixed with better error handling
+// app/(dashboard)/dashboard/page.tsx - Fixed version
 "use client";
 
 import { useEffect } from "react";
@@ -48,10 +48,43 @@ export default function UserDashboard() {
     }
   }, [requireAuth, user, subscriptions.length, loading, error, toast]);
 
-  const handlePauseSubscription = async (id: string) => {
-    const success = await pauseSubscription(id);
-    if (success) {
-      await refetch();
+  // Fixed pause handler to properly pass Date object
+  const handlePauseSubscription = async (
+    id: string,
+    pauseUntil: Date
+  ): Promise<boolean> => {
+    console.log("🎯 UserDashboard handlePauseSubscription:", {
+      id,
+      pauseUntil,
+      pauseUntilType: typeof pauseUntil,
+      isValidDate: pauseUntil instanceof Date && !isNaN(pauseUntil.getTime()),
+    });
+
+    // Validate pauseUntil parameter
+    if (!(pauseUntil instanceof Date) || isNaN(pauseUntil.getTime())) {
+      console.error("🎯 Invalid pauseUntil in UserDashboard:", pauseUntil);
+      toast({
+        title: "Error",
+        description: "Tanggal tidak valid",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    try {
+      const success = await pauseSubscription(id, pauseUntil);
+      if (success) {
+        await refetch();
+      }
+      return success;
+    } catch (error) {
+      console.error("🎯 Error in handlePauseSubscription:", error);
+      toast({
+        title: "Error",
+        description: "Gagal menjeda langganan",
+        variant: "destructive",
+      });
+      return false;
     }
   };
 
@@ -62,17 +95,35 @@ export default function UserDashboard() {
     );
 
     if (confirmed) {
-      const success = await cancelSubscription(id);
-      if (success) {
-        await refetch();
+      try {
+        const success = await cancelSubscription(id);
+        if (success) {
+          await refetch();
+        }
+      } catch (error) {
+        console.error("Error cancelling subscription:", error);
+        toast({
+          title: "Error",
+          description: "Gagal membatalkan langganan",
+          variant: "destructive",
+        });
       }
     }
   };
 
   const handleReactivateSubscription = async (id: string) => {
-    const success = await reactivateSubscription(id);
-    if (success) {
-      await refetch();
+    try {
+      const success = await reactivateSubscription(id);
+      if (success) {
+        await refetch();
+      }
+    } catch (error) {
+      console.error("Error reactivating subscription:", error);
+      toast({
+        title: "Error",
+        description: "Gagal mengaktifkan kembali langganan",
+        variant: "destructive",
+      });
     }
   };
 

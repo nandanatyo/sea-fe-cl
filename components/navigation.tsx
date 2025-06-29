@@ -1,4 +1,3 @@
-// components/navigation.tsx - Clean version without debug UI
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, User, Heart, LogOut, Settings } from "lucide-react";
+import { Menu, User, Heart, LogOut, Settings, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/hooks/use-auth";
 
@@ -112,6 +111,7 @@ export function Navigation() {
             </>
           ) : (
             <>
+              {/* Regular User Login */}
               <Button
                 asChild
                 variant="ghost"
@@ -122,6 +122,20 @@ export function Navigation() {
                   Masuk
                 </Link>
               </Button>
+
+              {/* Admin Login Button */}
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="text-blue-600 border-blue-200 hover:bg-blue-50">
+                <Link href="/admin/login">
+                  <Shield className="h-4 w-4 mr-2" />
+                  Admin
+                </Link>
+              </Button>
+
+              {/* Register Button */}
               <Button
                 asChild
                 size="sm"
@@ -203,9 +217,23 @@ export function Navigation() {
                       className="w-full justify-start text-left">
                       <Link href="/login" onClick={() => setIsOpen(false)}>
                         <User className="h-4 w-4 mr-2" />
-                        Masuk ke Akun
+                        Login User
                       </Link>
                     </Button>
+
+                    {/* Mobile Admin Login */}
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full justify-start text-left text-blue-600 border-blue-200 hover:bg-blue-50">
+                      <Link
+                        href="/admin/login"
+                        onClick={() => setIsOpen(false)}>
+                        <Shield className="h-4 w-4 mr-2" />
+                        Login Admin
+                      </Link>
+                    </Button>
+
                     <Button
                       asChild
                       className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700">

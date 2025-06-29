@@ -206,12 +206,58 @@ export const authService = {
 
   setCurrentUser(user: User): void {
     if (typeof window !== "undefined") {
-      localStorage.setItem("user", JSON.stringify(user));
-      console.log("👤 User stored:", {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      });
+      try {
+        const userString = JSON.stringify(user);
+        localStorage.setItem("user", userString);
+        console.log("👤 User stored successfully:", {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          name: user.name || user.fullName,
+          dataSize: userString.length,
+        });
+      } catch (error) {
+        console.error("👤 Error storing user:", error);
+        throw new Error("Failed to store user data");
+      }
+    }
+  },
+
+  getCurrentUser(): User | null {
+    if (typeof window === "undefined") return null;
+
+    try {
+      const userData = localStorage.getItem("user");
+      if (!userData) {
+        console.log("👤 No user data found in localStorage");
+        return null;
+      }
+
+      const user = JSON.parse(userData);
+
+      if (
+        user &&
+        typeof user === "object" &&
+        user.id &&
+        user.email &&
+        user.role
+      ) {
+        console.log("👤 Retrieved valid user:", {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          name: user.name || user.fullName,
+        });
+        return user;
+      } else {
+        console.error("👤 Invalid user data structure:", user);
+        this.removeAuthToken();
+        return null;
+      }
+    } catch (error) {
+      console.error("👤 Error parsing user data:", error);
+      this.removeAuthToken();
+      return null;
     }
   },
 
@@ -222,31 +268,6 @@ export const authService = {
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
     localStorage.removeItem("refresh_token"); // Clean up old refresh token if exists
-  },
-
-  getCurrentUser(): User | null {
-    if (typeof window === "undefined") return null;
-
-    try {
-      const userData = localStorage.getItem("user");
-      const user = userData ? JSON.parse(userData) : null;
-
-      if (user) {
-        console.log("👤 Retrieved user:", {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-        });
-      } else {
-        console.log("👤 No user found in localStorage");
-      }
-
-      return user;
-    } catch (error) {
-      console.error("👤 Error parsing user data:", error);
-      this.removeAuthToken();
-      return null;
-    }
   },
 
   getAccessToken(): string | null {

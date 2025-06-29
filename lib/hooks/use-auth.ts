@@ -1,4 +1,4 @@
-// lib/hooks/use-auth.ts - Clean version without debug UI
+// lib/hooks/use-auth.ts - Fixed admin login management
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { authService, type LoginData, type RegisterData } from "@/lib/api/auth";
@@ -49,7 +49,7 @@ export function useAuth() {
     retry: false,
   });
 
-  // Login mutation
+  // Login mutation (regular user)
   const loginMutation = useMutation({
     mutationFn: async (data: LoginData) => {
       const response = await authService.login(data);
@@ -188,21 +188,75 @@ export function useAuth() {
     },
   });
 
-  // Admin login mutation
+  // Admin login mutation - Fixed to properly handle auth state
   const adminLoginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
+      console.log("🔐 Starting admin login mutation...");
+
       const response = await adminService.login(data);
+
+      console.log("🔐 Admin service response:", response);
+
       if (!response.success) {
         throw new Error(response.error || "Admin login failed");
       }
+
+      if (!response.data) {
+        throw new Error("No data received from admin login");
+      }
+
       return response.data;
     },
     onSuccess: (data) => {
-      if (data) {
+      console.log("🔐 Admin login mutation success:", data);
+
+      try {
+        if (!data) {
+          throw new Error("No data received");
+        }
+
+        if (!data.user) {
+          throw new Error(
+            `No user object in response. Received keys: ${Object.keys(data)}`
+          );
+        }
+
+        if (!data.user.id) {
+          throw new Error("User object missing required 'id' field");
+        }
+
+        if (!data.user.email) {
+          throw new Error("User object missing required 'email' field");
+        }
+
+        if (!data.user.role) {
+          throw new Error("User object missing required 'role' field");
+        }
+
+        if (!data.access_token) {
+          throw new Error("No access token in response");
+        }
+
+        // Verify user is admin
+        if (data.user.role !== "admin") {
+          throw new Error(`User role is '${data.user.role}', not 'admin'`);
+        }
+
+        console.log("🔐 All validation passed, storing auth data...");
+
+        // Store authentication data using authService methods
+        authService.setAuthToken(data.access_token);
+        authService.setCurrentUser(data.user);
+
         const convertedUser = convertUserFromBackend(data.user);
 
-        // Update the query cache with new user data
+        // Update the query cache with new admin user data
         queryClient.setQueryData(authQueryKeys.currentUser, convertedUser);
+
+        console.log("🔐 Admin auth data stored successfully:", {
+          user: convertedUser,
+          tokenLength: data.access_token.length,
+        });
 
         notifications.success({
           title: `Selamat datang, Admin ${
@@ -212,18 +266,42 @@ export function useAuth() {
           duration: 5000,
         });
 
+        // Navigate to admin dashboard
         router.push(ROUTES.DASHBOARD.ADMIN);
+      } catch (processingError) {
+        console.error(
+          "🔐 Error processing admin login success:",
+          processingError
+        );
+        throw processingError;
       }
     },
     onError: (error: Error) => {
+      console.error("🔐 Admin login mutation error:", error);
+
+      // More specific error messages
+      let errorDescription = "Email atau password admin salah";
+
+      if (error.message.includes("role")) {
+        errorDescription =
+          "Akun ini bukan admin. Gunakan akun admin yang valid.";
+      } else if (error.message.includes("token")) {
+        errorDescription = "Server tidak mengembalikan token akses yang valid.";
+      } else if (error.message.includes("user")) {
+        errorDescription = "Data user tidak valid dalam response server.";
+      } else if (error.message.includes("undefined")) {
+        errorDescription = "Response server tidak lengkap. Coba lagi.";
+      }
+
       notifications.error({
         title: "Login admin gagal 🚫",
-        description: error.message || "Email atau password admin salah",
+        description: errorDescription,
         action: {
           label: "Hubungi IT",
           onClick: () => {
             window.open(
-              "mailto:it@seacatering.id?subject=Admin Login Issue",
+              "mailto:it@seacatering.id?subject=Admin Login Issue&body=" +
+                encodeURIComponent(`Error: ${error.message}`),
               "_blank"
             );
           },
@@ -272,7 +350,15 @@ export function useAuth() {
   };
 
   const requireAdmin = () => {
+    console.log("🔍 Checking admin access:", {
+      hasUser: !!user,
+      userRole: user?.role,
+      tokenValid: authService.validateToken(),
+    });
+
     if (!user || user.role !== "admin" || !authService.validateToken()) {
+      console.log("❌ Admin access denied");
+
       notifications.error({
         title: "Akses Ditolak 🚫",
         description: "Kamu tidak memiliki akses ke halaman admin.",
@@ -285,6 +371,8 @@ export function useAuth() {
       router.push(user ? ROUTES.DASHBOARD.USER : ROUTES.HOME);
       return false;
     }
+
+    console.log("✅ Admin access granted");
     return true;
   };
 

@@ -1,4 +1,4 @@
-// lib/api/client.ts - Enhanced with better response format handling
+// lib/api/client.ts - Enhanced with better response format handling for admin endpoints
 import { ApiResponse } from "@/lib/types";
 import { notifications } from "@/lib/utils/notifications";
 
@@ -127,17 +127,44 @@ class ApiClient {
         return errorResponse;
       }
 
-      // Handle different response formats from backend
+      // Check if backend explicitly indicates failure even with 200 status
+      if (data && typeof data === "object" && data.success === false) {
+        const errorResponse = {
+          success: false,
+          error: data.error || data.message || "Backend operation failed",
+        };
+
+        console.error(`🌐 Backend Error (success: false):`, data);
+
+        if (showErrorNotification) {
+          notifications.error({
+            title: "Operasi gagal",
+            description: errorResponse.error,
+          });
+        }
+
+        return errorResponse;
+      }
+
+      // Enhanced response handling for different backend formats
       let responseData = data;
 
-      // Backend might return data in different formats:
-      // 1. Direct data: { "id": "123", "name": "..." }
-      // 2. Wrapped in data field: { "data": [...], "message": "success" }
-      // 3. Wrapped with metadata: { "data": [...], "meta": {...}, "message": "success" }
-
       if (data && typeof data === "object") {
+        // Special handling for admin login endpoint
+        if (endpoint.includes("/admin/login") && data.success && data.data) {
+          console.log(`🌐 Admin login response detected, using data field`);
+          responseData = data.data;
+        }
+        // If response has success field and data field (standard backend format)
+        else if (data.success !== undefined && data.data !== undefined) {
+          responseData = data.data;
+          console.log(
+            `🌐 Standard backend response, extracted data:`,
+            responseData
+          );
+        }
         // If response has a 'data' field, use that as the main data
-        if (data.data !== undefined) {
+        else if (data.data !== undefined) {
           responseData = data.data;
           console.log(`🌐 Extracted data from response.data:`, responseData);
         }
@@ -145,6 +172,11 @@ class ApiClient {
         else if (data.items !== undefined) {
           responseData = data.items;
           console.log(`🌐 Extracted data from response.items:`, responseData);
+        }
+        // If response has results field
+        else if (data.results !== undefined) {
+          responseData = data.results;
+          console.log(`🌐 Extracted data from response.results:`, responseData);
         }
         // Otherwise use the entire response as data
         else {

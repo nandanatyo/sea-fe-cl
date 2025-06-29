@@ -1,6 +1,11 @@
 // lib/hooks/use-subscription.ts - Fixed to prevent object rendering
 import { useState, useEffect } from "react";
 import {
+  createPauseDateRange,
+  validatePauseDateRange,
+  formatDateID,
+} from "@/lib/utils/date";
+import {
   subscriptionService,
   type CreateSubscriptionData,
 } from "@/lib/api/subscriptions";
@@ -221,19 +226,35 @@ export function useSubscription(userId?: string) {
     }
   };
 
-  const pauseSubscription = async (id: string, pauseUntil?: Date) => {
+  const pauseSubscription = async (id: string, pauseUntil: Date) => {
     try {
       setLoading(true);
 
-      const startDate = new Date().toISOString();
-      const endDate =
-        pauseUntil?.toISOString() ||
-        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // Default 30 days
+      const now = new Date();
 
-      const response = await subscriptionService.pause(id, {
-        start_date: startDate,
-        end_date: endDate,
+      // Validate that pauseUntil is in the future
+      if (pauseUntil <= now) {
+        throw new Error("Tanggal berakhir harus setelah hari ini");
+      }
+
+      // Prepare pause data with proper ISO format
+      const pauseData = {
+        start_date: now.toISOString(),
+        end_date: pauseUntil.toISOString(),
+      };
+
+      console.log("📝 Pause subscription request:", {
+        subscriptionId: id,
+        startDate: pauseData.start_date,
+        endDate: pauseData.end_date,
+        startDisplay: formatDateID(pauseData.start_date),
+        endDisplay: formatDateID(pauseData.end_date),
+        durationDays: Math.ceil(
+          (pauseUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        ),
       });
+
+      const response = await subscriptionService.pause(id, pauseData);
 
       if (!response.success) {
         const errorMessage = getErrorMessage(response.error || response);
@@ -242,11 +263,10 @@ export function useSubscription(userId?: string) {
 
       notifications.success({
         title: "Langganan berhasil dijeda! ⏸️",
-        description: pauseUntil
-          ? `Langganan akan otomatis aktif lagi pada ${pauseUntil.toLocaleDateString(
-              "id-ID"
-            )}`
-          : "Langganan akan otomatis aktif lagi dalam 30 hari",
+        description: `Langganan akan otomatis aktif lagi pada ${formatDateID(
+          pauseUntil
+        )}`,
+        duration: 6000,
         action: {
           label: "Aktifkan Sekarang",
           onClick: () => reactivateSubscription(id),
@@ -259,10 +279,41 @@ export function useSubscription(userId?: string) {
       console.error("📝 Pause subscription error:", error);
 
       const errorMessage = getErrorMessage(error);
-      notifications.error({
-        title: "Gagal menjeda langganan",
-        description: errorMessage,
-      });
+
+      // Handle specific backend errors
+      if (
+        errorMessage.includes("invalid pause dates") ||
+        errorMessage.includes("Invalid pause dates")
+      ) {
+        notifications.error({
+          title: "Format tanggal tidak valid ❌",
+          description:
+            "Terjadi masalah dengan format tanggal. Coba pilih tanggal yang berbeda.",
+          action: {
+            label: "Coba Lagi",
+            onClick: () => {
+              console.log("Retry pause subscription");
+            },
+          },
+        });
+      } else if (
+        errorMessage.includes("duration") ||
+        errorMessage.includes("future")
+      ) {
+        notifications.error({
+          title: "Tanggal tidak valid ⏰",
+          description: errorMessage,
+        });
+      } else {
+        notifications.error({
+          title: "Gagal menjeda langganan",
+          description: errorMessage,
+          action: {
+            label: "Hubungi Support",
+            onClick: () => window.open("https://wa.me/08123456789", "_blank"),
+          },
+        });
+      }
 
       return false;
     } finally {

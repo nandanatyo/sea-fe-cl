@@ -146,19 +146,69 @@ export const subscriptionService = {
     data: PauseSubscriptionData
   ): Promise<ApiResponse<void>> {
     try {
+      console.log("📝 Subscription pause request:", {
+        subscriptionId: id,
+        pauseData: data,
+      });
+
+      // Validate date formats before sending to backend
+      const startDate = new Date(data.start_date);
+      const endDate = new Date(data.end_date);
+
+      if (isNaN(startDate.getTime())) {
+        throw new Error("Invalid start_date format. Expected ISO string.");
+      }
+
+      if (isNaN(endDate.getTime())) {
+        throw new Error("Invalid end_date format. Expected ISO string.");
+      }
+
+      if (endDate <= startDate) {
+        throw new Error("End date must be after start date");
+      }
+
+      // Ensure minimum pause duration (1 day)
+      const diffMs = endDate.getTime() - startDate.getTime();
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 1) {
+        throw new Error("Pause duration must be at least 1 day");
+      }
+
+      // Ensure dates are in proper ISO format with Z timezone
+      const validatedData: PauseSubscriptionData = {
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+      };
+
+      console.log("📝 Validated pause data being sent to backend:", {
+        subscriptionId: id,
+        data: validatedData,
+        durationDays: diffDays,
+        endpoint: API_ENDPOINTS.SUBSCRIPTIONS.PAUSE(id),
+      });
+
       const response = await apiClient.put<void>(
         API_ENDPOINTS.SUBSCRIPTIONS.PAUSE(id),
-        data
+        validatedData
       );
 
+      console.log("📝 Backend pause response:", response);
+
       if (response.success) {
-        // Format resume date for notification
-        const resumeDate = new Date(data.end_date).toLocaleDateString("id-ID");
+        const resumeDate = endDate.toLocaleDateString("id-ID", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+
         notifications.operationSuccess.subscriptionPaused(resumeDate);
       }
 
       return response;
     } catch (error) {
+      console.error("📝 Subscription pause error:", error);
+
       return {
         success: false,
         error:

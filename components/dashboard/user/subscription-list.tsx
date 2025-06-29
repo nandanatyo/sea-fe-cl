@@ -11,14 +11,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Eye, Pause, X, Play } from "lucide-react";
+import { Eye, X, Play } from "lucide-react";
 import { Subscription } from "@/lib/types";
 import { formatDate, formatCurrency } from "@/lib/utils/format";
 import { MEAL_PLANS, MEAL_TYPES, DELIVERY_DAYS } from "@/lib/constants";
+import { PauseSubscriptionDialog } from "@/components/dashboard/user/pause-subscription-dialog";
 
 interface SubscriptionListProps {
   subscriptions: Subscription[];
-  onPause?: (id: string) => void;
+  onPause?: (id: string, pauseUntil: Date) => Promise<boolean>;
   onCancel?: (id: string) => void;
   onReactivate?: (id: string) => void;
   type: "active" | "paused" | "cancelled";
@@ -222,14 +223,11 @@ export function SubscriptionList({
                 </Dialog>
 
                 {type === "active" && onPause && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-orange-600 border-orange-200"
-                    onClick={() => onPause(subscription.id)}>
-                    <Pause className="h-4 w-4 mr-2" />
-                    Jeda
-                  </Button>
+                  <PauseSubscriptionDialog
+                    subscriptionId={subscription.id}
+                    subscriptionName={`${plan?.name} - ${subscription.name}`}
+                    onPause={onPause}
+                  />
                 )}
 
                 {type === "active" && onCancel && (

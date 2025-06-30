@@ -1,4 +1,4 @@
-// app/(dashboard)/admin/dashboard/page.tsx
+// app/(dashboard)/admin/dashboard/page.tsx - Production version
 "use client";
 
 import { useState, useEffect } from "react";
@@ -35,7 +35,7 @@ export default function AdminDashboard() {
   const [metrics, setMetrics] = useState<AdminMetrics>({
     active_subscriptions: 0,
     new_subscriptions: 0,
-    monthly_recurring_revenue: 0,
+    monthly_revenue: 0,
     reactivations: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -60,6 +60,7 @@ export default function AdminDashboard() {
       } else {
         // Fallback to general dashboard data
         const dashboardResponse = await adminService.getDashboard();
+
         if (dashboardResponse.success && dashboardResponse.data) {
           setMetrics(dashboardResponse.data);
         } else {
@@ -71,17 +72,18 @@ export default function AdminDashboard() {
 
           if (statsResponse.success && statsResponse.data) {
             // Map subscription stats to admin metrics format
-            setMetrics({
+            const mappedMetrics = {
               active_subscriptions: statsResponse.data.active_subscriptions,
               new_subscriptions: statsResponse.data.total_subscriptions,
-              monthly_recurring_revenue:
-                statsResponse.data.monthly_recurring_revenue,
+              monthly_revenue: statsResponse.data.monthly_recurring_revenue,
               reactivations: statsResponse.data.reactivations || 0,
-              subscription_growth: 0, // Calculate if needed
+              subscription_growth: 0,
               conversion_rate: statsResponse.data.conversion_rate || 0,
               churn_rate: statsResponse.data.churn_rate || 0,
-              total_users: 0, // Would need user management endpoint
-            });
+              total_users: 0,
+            };
+
+            setMetrics(mappedMetrics);
           }
         }
       }
@@ -203,10 +205,10 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">
-                    Monthly Recurring Revenue
+                    Monthly Revenue
                   </p>
                   <p className="text-3xl font-bold text-blue-600">
-                    {formatCurrency(metrics.monthly_recurring_revenue || 0)}
+                    {formatCurrency(metrics.monthly_revenue || 0)}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     pendapatan bulanan
@@ -248,9 +250,7 @@ export default function AdminDashboard() {
                     Total Langganan Aktif
                   </p>
                   <p className="text-3xl font-bold text-orange-600">
-                    {metrics.active_subscriptions ||
-                      metrics.totalActiveSubscriptions ||
-                      0}
+                    {metrics.active_subscriptions || 0}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">saat ini</p>
                 </div>
@@ -293,19 +293,19 @@ export default function AdminDashboard() {
                     Total pengguna terdaftar:
                   </span>
                   <span className="font-bold text-xl">
-                    {metrics.total_users || metrics.totalUsers || 0}
+                    {metrics.total_users || 0}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Conversion rate:</span>
                   <span className="font-bold text-xl text-green-600">
-                    {metrics.conversion_rate || metrics.conversionRate || 0}%
+                    {metrics.conversion_rate || 0}%
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Churn rate:</span>
                   <span className="font-bold text-xl text-red-600">
-                    {metrics.churn_rate || metrics.churnRate || 0}%
+                    {metrics.churn_rate || 0}%
                   </span>
                 </div>
               </div>
@@ -332,7 +332,7 @@ export default function AdminDashboard() {
                     </p>
                     <p>
                       • Revenue meningkat{" "}
-                      {formatCurrency(metrics.monthly_recurring_revenue || 0)}
+                      {formatCurrency(metrics.monthly_revenue || 0)}
                     </p>
                     <p>
                       • {metrics.reactivations || 0} pelanggan kembali aktif

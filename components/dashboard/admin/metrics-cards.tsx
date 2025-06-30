@@ -1,3 +1,4 @@
+// components/dashboard/admin/metrics-cards.tsx - Simple fix
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +14,7 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
   const cards = [
     {
       title: "Langganan Baru",
-      value: metrics.newSubscriptions,
+      value: metrics.new_subscriptions,
       description: "dalam periode ini",
       icon: Users,
       color: "text-green-600",
@@ -21,7 +22,8 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
     },
     {
       title: "Monthly Recurring Revenue",
-      value: formatCurrency(metrics.monthlyRecurringRevenue),
+      // Change from monthly_recurring_revenue to monthly_revenue
+      value: formatCurrency(metrics.monthly_revenue),
       description: "pendapatan bulanan",
       icon: DollarSign,
       color: "text-blue-600",
@@ -29,7 +31,7 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
     },
     {
       title: "Reaktivasi",
-      value: metrics.reactivations,
+      value: metrics.reactivations || 0,
       description: "langganan kembali aktif",
       icon: RefreshCw,
       color: "text-purple-600",
@@ -37,7 +39,7 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
     },
     {
       title: "Total Langganan Aktif",
-      value: metrics.totalActiveSubscriptions,
+      value: metrics.active_subscriptions,
       description: "saat ini",
       icon: TrendingUp,
       color: "text-orange-600",

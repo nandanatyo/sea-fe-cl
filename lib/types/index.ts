@@ -101,11 +101,15 @@ export interface AdminMetrics {
   totalActiveSubscriptions?: number; // Frontend compatibility
   new_subscriptions: number;
   newSubscriptions?: number; // Frontend compatibility
-  monthly_recurring_revenue: number;
-  monthlyRecurringRevenue?: number; // Frontend compatibility
+
+  // Change from monthly_recurring_revenue to monthly_revenue to match backend
+  monthly_revenue: number; // Backend field name
+  monthlyRecurringRevenue?: number; // Keep for compatibility
+
   total_revenue?: number;
   reactivations?: number;
   subscription_growth?: number;
+  subscription_growth_percentage?: number; // Backend field
   subscriptionGrowth?: number; // Frontend compatibility
   conversion_rate?: number;
   conversionRate?: number; // Frontend compatibility
@@ -113,6 +117,8 @@ export interface AdminMetrics {
   churnRate?: number; // Frontend compatibility
   cancelled_subscriptions?: number;
   paused_subscriptions?: number;
+  revenue_growth_percentage?: number; // Backend field
+  pending_testimonials?: number; // Backend field
 }
 
 export interface ApiResponse<T> {
